@@ -182,6 +182,43 @@ Provides empirical verification of the chosen pHash threshold (<= 4). It confirm
 3. **Q: Why inspect borderline pairs at distance 3 and 4 rather than only distance 0?**
    - **A:** Distance 0 only shows exact or near-identical images. The hardest cases and highest risk of false merges or missed duplicates occur at the threshold boundary (3 and 4). Visual inspection of the borderline pairs proves that threshold 4 captures meaningful similarities without collapsing unrelated images into mega-clusters.
 
+---
+
+## 11. `src/models.py`
+
+### What it does
+Defines the PyTorch neural network architectures for EcoVision, specifically `BaselineCNN`: a small convolutional neural network built from scratch containing 4 convolutional blocks (each comprising `Conv2d` -> `BatchNorm2d` -> `ReLU` -> `MaxPool2d`), followed by Global Average Pooling (`AdaptiveAvgPool2d((1, 1))`), Dropout (`p=0.3`), and a 6-class linear classification head (~390k trainable parameters).
+
+### Why it exists
+Establishes an empirical, unconfounded baseline for waste image classification trained entirely from scratch. This acts as the scientific anchor to quantify the true benefits of transfer learning (Phase 4) and data augmentation (Phase 5).
+
+### Interview Questions & Answers
+1. **Q: Why place Batch Normalization after Conv2d and before ReLU?**
+   - **A:** Batch Normalization standardizes intermediate feature map distributions across mini-batches, stabilizing training dynamics, smoothing the optimization landscape, and allowing faster convergence with higher learning rates (such as `1e-3`).
+2. **Q: Why use Global Average Pooling (GAP) instead of flattening dense layers?**
+   - **A:** Flattening high-dimensional feature maps into dense layers requires millions of parameters, creating massive memory overhead and severe susceptibility to overfitting. GAP reduces spatial dimensions to 1x1 averages, creating a robust, translation-invariant vector fed directly into the classification head with minimal parameters.
+3. **Q: Why train a CNN from scratch as a baseline rather than jumping immediately to pretrained models like ResNet or ConvNeXt?**
+   - **A:** A baseline from scratch evaluates the dataset's intrinsic learnability under identical split conditions. Without a scratch baseline, it is impossible to scientifically isolate how much performance gain comes from dataset quality versus pretrained ImageNet feature representations.
+
+---
+
+## 12. `src/train_baseline.py`
+
+### What it does
+Executes the training and validation pipeline for `BaselineCNN`. It loads 224x224 images from `data/processed/{train,val}`, applies ImageNet normalization without augmentation, computes balanced class weights strictly from the train split, optimizes with Adam (`lr=1e-3`), applies early stopping on validation macro-F1 (patience 7), checkpoints the best weights to `models/baseline_cnn.pt`, logs training history to `reports/baseline_history.csv`, generates loss/macro-F1 curves in `reports/baseline_curves.png`, and outputs detailed validation metrics to `reports/baseline_val_metrics.json`.
+
+### Why it exists
+Fulfills Phase 3 modeling requirements while strictly adhering to core ML principles: evaluating only on validation data and keeping the test set completely pristine for final evaluation.
+
+### Interview Questions & Answers
+1. **Q: Why calculate class weights strictly from the training split?**
+   - **A:** Deriving class weights from validation or test splits introduces data leakage (specifically, prior distribution leakage). The model and loss function must only access information available during training; the validation split must remain an uninfluenced proxy for unseen data.
+2. **Q: Why use macro-F1 for early stopping rather than validation loss or accuracy?**
+   - **A:** TrashNet exhibits a 4.34:1 class imbalance, where the `trash` category represents only 5.4% of samples. A model could achieve high accuracy or lower overall loss while predicting poorly on minority classes. Macro-F1 weights all classes equally, stopping training when performance across all categories—especially rare classes—is maximized.
+3. **Q: Why is data augmentation explicitly disabled in this phase?**
+   - **A:** Scientific rigor requires isolating experimental variables. Disabling augmentation in Phase 3 establishes the true baseline performance on the raw processed data. When augmentation is evaluated in Phase 5, any improvement can be directly attributed to augmentation techniques rather than confounded model changes.
+
+
 
 
 

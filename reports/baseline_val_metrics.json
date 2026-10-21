@@ -1,0 +1,56 @@
+{
+  "model": "BaselineCNN",
+  "num_parameters": 390438,
+  "best_epoch": 17,
+  "total_epochs_trained": 24,
+  "total_training_time_seconds": 213.5,
+  "val_loss": 0.8458,
+  "val_accuracy": 0.6913,
+  "val_macro_f1": 0.6658,
+  "class_weights": {
+    "cardboard": 1.0383,
+    "glass": 0.8443,
+    "metal": 1.031,
+    "paper": 0.7063,
+    "plastic": 0.8745,
+    "trash": 3.093
+  },
+  "per_class": {
+    "cardboard": {
+      "precision": 0.88,
+      "recall": 0.7333,
+      "f1_score": 0.8,
+      "support": 60
+    },
+    "glass": {
+      "precision": 0.6522,
+      "recall": 0.6,
+      "f1_score": 0.625,
+      "support": 75
+    },
+    "metal": {
+      "precision": 0.5102,
+      "recall": 0.8065,
+      "f1_score": 0.625,
+      "support": 62
+    },
+    "paper": {
+      "precision": 0.9275,
+      "recall": 0.7191,
+      "f1_score": 0.8101,
+      "support": 89
+    },
+    "plastic": {
+      "precision": 0.7206,
+      "recall": 0.6806,
+      "f1_score": 0.7,
+      "support": 72
+    },
+    "trash": {
+      "precision": 0.4,
+      "recall": 0.4762,
+      "f1_score": 0.4348,
+      "support": 21
+    }
+  }
+}
