@@ -1,0 +1,23 @@
+# Core Deep Learning Framework (CUDA-enabled via PyTorch index)
+--extra-index-url https://download.pytorch.org/whl/cu124
+torch>=2.2.0
+torchvision>=0.17.0
+
+# Dataset acquisition & processing
+datasets>=2.18.0
+huggingface_hub>=0.20.0
+pillow>=10.0.0
+imagehash>=4.3.1
+
+# Data manipulation & metrics
+numpy>=1.26.0
+pandas>=2.2.0
+scikit-learn>=1.4.0
+
+# Visualization
+matplotlib>=3.8.0
+seaborn>=0.13.0
+
+# Inference & Interactive Demo
+gradio>=4.0.0
+tqdm>=4.66.0
