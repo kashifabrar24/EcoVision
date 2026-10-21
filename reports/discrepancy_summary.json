@@ -1,0 +1,41 @@
+{
+  "dataset_name": "TrashNet",
+  "huggingface_repo": "garythung/trashnet",
+  "total_hf_rows": 5054,
+  "github_commit": "6fa2b87",
+  "total_github_images": 2527,
+  "ratio_total": 2.0,
+  "exact_class_ratios_all_2x": true,
+  "unique_pixel_md5_count": 5048,
+  "exact_pixel_md5_duplicates": 6,
+  "unique_phash_count": 2807,
+  "half_size": 2527,
+  "first_half_archive": "dataset-original.zip",
+  "first_half_resolution_range": {
+    "width": [
+      3264,
+      4032
+    ],
+    "height": [
+      2448,
+      3024
+    ]
+  },
+  "second_half_archive": "dataset-resized.zip",
+  "second_half_resolution_range": {
+    "width": [
+      512,
+      512
+    ],
+    "height": [
+      384,
+      384
+    ]
+  },
+  "identical_filename_and_label_pairs": 2527,
+  "phash_exact_overlap_count": 2238,
+  "corresponding_pair_zero_hamming_count": 2242,
+  "corresponding_pair_le4_hamming_count": 2527,
+  "corresponding_pair_avg_hamming_distance": 0.2287,
+  "explanation": "The Hugging Face dataset repository contains both 'dataset-original.zip' (2,527 high-resolution images ranging from 512px to 4000px wide) and 'dataset-resized.zip' (2,527 images downscaled to ~512x384). Because Hugging Face's auto-generated imagefolder loader ingested both zip files in the repository root, it loaded both archives into a single 'train' split, creating exactly 2x (5,054) total rows. Every image in the first half has an exact downscaled counterpart in the second half with matching filenames, matching class labels, and near-zero perceptual hash distance."
+}

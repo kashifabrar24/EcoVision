@@ -1,0 +1,7 @@
+class,github_count,hf_count,ratio_hf_to_gh,hf_pct,gh_pct
+paper,594,1188,2.0,23.51,23.51
+glass,501,1002,2.0,19.83,19.83
+plastic,482,964,2.0,19.07,19.07
+metal,410,820,2.0,16.22,16.22
+cardboard,403,806,2.0,15.95,15.95
+trash,137,274,2.0,5.42,5.42
