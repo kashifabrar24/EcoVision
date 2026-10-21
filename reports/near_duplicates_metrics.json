@@ -1,0 +1,34 @@
+{
+  "threshold_0": {
+    "hamming_threshold": 0,
+    "pairs_within_threshold": 2,
+    "cross_class_pairs": 0,
+    "duplicate_groups_count": 2,
+    "total_images_in_groups": 4,
+    "largest_group_size": 2
+  },
+  "threshold_2": {
+    "hamming_threshold": 2,
+    "pairs_within_threshold": 15,
+    "cross_class_pairs": 1,
+    "duplicate_groups_count": 15,
+    "total_images_in_groups": 30,
+    "largest_group_size": 2
+  },
+  "threshold_4": {
+    "hamming_threshold": 4,
+    "pairs_within_threshold": 25,
+    "cross_class_pairs": 2,
+    "duplicate_groups_count": 25,
+    "total_images_in_groups": 50,
+    "largest_group_size": 2
+  },
+  "threshold_6": {
+    "hamming_threshold": 6,
+    "pairs_within_threshold": 45,
+    "cross_class_pairs": 9,
+    "duplicate_groups_count": 40,
+    "total_images_in_groups": 85,
+    "largest_group_size": 4
+  }
+}

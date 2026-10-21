@@ -146,6 +146,25 @@ Fulfills Phase 1 documentation deliverables and equips recruitment reviewers wit
 3. **Q: Why was `dataset-original.zip` paired with `dataset-resized.zip` on Hugging Face?**
    - **A:** The original TrashNet repository contained both raw high-resolution captures (up to 4000px) and a convenience downscaled set (`resize.py` output to 512×384). Hugging Face mirrored both archives without realizing its automatic dataset loader would combine both into the same split.
 
+---
+
+## 9. `src/dedupe_split.py`
+
+### What it does
+Restricts processing strictly to the 2,527 unique resized images, removes the 3 conflicting duplicate pairs (6 images) by filename logging them to `reports/removed_images.csv`, analyzes near-duplicate Hamming distance thresholds (0, 2, 4, 6), groups near-duplicates via connected components, executes a leak-proof Stratified GROUP Split (70% train, 15% val, 15% test, seed 42), and caches 224×224 images to `data/processed/`.
+
+### Why it exists
+Enforces Phase 2 requirements: preventing data contamination across splits, ensuring zero leakage of near-duplicate shots, verifying minority class representation across all splits, and preprocessing images to the standard 224×224 input resolution for CNN training.
+
+### Interview Questions & Answers
+1. **Q: Why is Stratified GROUP Split necessary instead of standard stratified random splitting?**
+   - **A:** If near-duplicate photos (e.g. the same object captured from two slightly different angles) are split randomly, one copy can end up in train and another in test. The model would memorize the specific object, yielding artificially inflated test metrics that fail on truly novel waste items.
+2. **Q: Why remove conflicting duplicate pairs (`glass115`/`metal91`) completely instead of assigning one label?**
+   - **A:** Without original experimental ground truth, any manual assignment introduces subjective bias. Removing both ambiguous instances (only 6 images out of 2,527) purges label noise cleanly without sacrificing statistical power.
+3. **Q: Why pre-cache resized 224×224 images to disk rather than resizing on the fly in `Dataset.__getitem__`?**
+   - **A:** On-the-fly resizing from 512×384 adds significant CPU overhead to every training epoch, causing GPU starvation on Windows with single-threaded data loading (`num_workers=0`). Pre-caching ensures ultra-fast I/O during model training.
+
+
 
 
 

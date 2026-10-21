@@ -1,0 +1,7 @@
+filename,label_name,md5,phash,conflicting_pair,removal_reason
+glass115.jpg,glass,50035a9538d7667528ee3461c83ef8e1,f363092c67333b89,metal91.jpg,glass vs metal contradiction
+glass176.jpg,glass,03b62f7033ed13e63138ebd048abc4ea,95e5f8aa074b264d,plastic152.jpg,glass vs plastic contradiction
+glass389.jpg,glass,814c3e8c70d2210e376c6adc088ffab7,ea4e91b5873292b6,plastic332.jpg,glass vs plastic contradiction
+metal91.jpg,metal,50035a9538d7667528ee3461c83ef8e1,f363092c67333b89,glass115.jpg,glass vs metal contradiction
+plastic152.jpg,plastic,03b62f7033ed13e63138ebd048abc4ea,95e5f8aa074b264d,glass176.jpg,glass vs plastic contradiction
+plastic332.jpg,plastic,814c3e8c70d2210e376c6adc088ffab7,ea4e91b5873292b6,glass389.jpg,glass vs plastic contradiction

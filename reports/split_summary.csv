@@ -1,0 +1,8 @@
+label_name,test,train,val,total
+cardboard,60,283,60,403
+glass,75,348,75,498
+metal,62,285,62,409
+paper,89,416,89,594
+plastic,72,336,72,480
+trash,21,95,21,137
+TOTAL,379,1763,379,2521
