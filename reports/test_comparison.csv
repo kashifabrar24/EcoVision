@@ -1,0 +1,9 @@
+metric,baseline_cnn,mobilenetv2_final,delta (final - baseline)
+Overall Accuracy,67.81%,89.71%,+21.90%
+Macro-F1 Score,0.6477,0.8647,+0.2170
+Cardboard F1,0.8160,0.9580,+0.1420
+Glass F1,0.5854,0.8844,+0.2990
+Metal F1,0.6543,0.9091,+0.2548
+Paper F1,0.7607,0.9438,+0.1831
+Plastic F1,0.6618,0.8611,+0.1993
+Trash F1,0.4082,0.6316,+0.2234

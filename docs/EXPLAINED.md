@@ -276,3 +276,21 @@ Serves as the authoritative, permanent record of the Phase 5 experiment. It adhe
    - **A:** With only 137 total unique images in TrashNet (and ~96 in train), the model has very few physical examples to learn the wide intra-class diversity of miscellaneous waste. Data augmentation (rotations, flips, color jitter, and random resized crops) synthesizes novel perspectives and lighting variations, drastically enriching the effective sample density for minority classes where feature sparsity is most severe.
 3. **Q: Why is selecting the best model seed based on validation performance slightly optimistic, and how is this addressed?**
    - **A:** Choosing the top-performing seed on validation (Seed 44 with macro-F1 = 0.9221) introduces a mild selection bias known as the "winner's curse," because the selected model may have benefited from favorable sample alignment on that specific validation set. This caveat is acknowledged openly in scientific reporting, and the holdout test set in Phase 6 serves as the definitive, unbiased arbiter of true model performance.
+
+---
+
+## 16. `src/evaluate_test.py`
+
+### What it does
+Executes the final holdout evaluation for Phase 6. It touches the test split (379 images) for the first and only time, loading `models/mobilenetv2_final.pt` and `models/baseline_cnn.pt` without augmentation. It logs per-image prediction probabilities to `reports/val_predictions.csv` and `reports/test_predictions.csv`, computes comprehensive classification metrics in `reports/test_metrics.json` and `reports/test_comparison.csv`, calculates 1,000-resample non-parametric bootstrap 95% confidence intervals in `reports/test_bootstrap_ci.json`, generates raw and row-normalized confusion matrices in `reports/test_confusion_matrix.png`, exports all misclassified test samples to `reports/test_errors.csv`, and visualizes failure cases in `reports/failure_cases.png`.
+
+### Why it exists
+Provides the definitive, unbiased benchmark of real-world model generalization. It proves that the model's high performance is not an artifact of validation overfitting, measures the true empirical margin over the scratch baseline (+21.90% accuracy, +0.2170 macro-F1), and surfaces failure modes for post-deployment monitoring.
+
+### Interview Questions & Answers
+1. **Q: Why must the holdout test set only be evaluated once after all training and model decisions are complete?**
+   - **A:** Evaluating repeatedly on a test set and tweaking hyperparameters, architectures, or augmentations based on test feedback causes data leakage ("data dredging" or test-set overfitting). The holdout test set must remain completely isolated from the model selection feedback loop so that its final score serves as an honest, statistically valid proxy for true out-of-distribution performance.
+2. **Q: Why use non-parametric bootstrapping (1,000 resamples) to compute confidence intervals?**
+   - **A:** Point estimates (such as "89.71% accuracy") conceal the sampling variability inherent to finite test datasets ($N=379$). Bootstrapping samples with replacement 1,000 times to construct empirical sampling distributions for accuracy and macro-F1 without assuming asymptotic normality, yielding robust 95% confidence intervals (accuracy: [0.8654, 0.9261], macro-F1: [0.8195, 0.9036]).
+3. **Q: Why did test macro-F1 (0.8647) decline relative to validation macro-F1 (0.9221) while overall test accuracy remained high (89.71%)?**
+   - **A:** Macro-F1 weights each class equally regardless of support. In the holdout test set, the severe minority `trash` class contains only 21 images and achieved an F1 of 0.6316 (due to 9 false negatives), pulling down the unweighted macro mean. Meanwhile, overall accuracy is dominated by well-represented classes like cardboard (F1 0.9580, support 60) and paper (F1 0.9438, support 89), where performance was outstanding.

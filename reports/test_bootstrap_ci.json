@@ -1,0 +1,26 @@
+{
+  "mobilenetv2_final": {
+    "accuracy": {
+      "mean": 0.8973,
+      "ci_95_lower": 0.8654,
+      "ci_95_upper": 0.9261
+    },
+    "macro_f1": {
+      "mean": 0.8638,
+      "ci_95_lower": 0.8195,
+      "ci_95_upper": 0.9036
+    }
+  },
+  "baseline_cnn": {
+    "accuracy": {
+      "mean": 0.6788,
+      "ci_95_lower": 0.6305,
+      "ci_95_upper": 0.723
+    },
+    "macro_f1": {
+      "mean": 0.647,
+      "ci_95_lower": 0.5953,
+      "ci_95_upper": 0.6959
+    }
+  }
+}

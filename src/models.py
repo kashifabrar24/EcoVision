@@ -54,18 +54,20 @@ class BaselineCNN(nn.Module):
         return sum(p.numel() for p in self.parameters() if p.requires_grad)
 
 
-def create_mobilenetv2_transfer(num_classes: int = 6, dropout_p: float = 0.3):
+def create_mobilenetv2_transfer(num_classes: int = 6, dropout_p: float = 0.3, pretrained: bool = True):
     """Instantiate ImageNet-pretrained MobileNetV2 with custom classification head.
 
     Replaces default 1000-class classifier with Dropout(p=dropout_p) + Linear(1280 -> num_classes).
     """
     import torchvision.models as tv_models
 
-    model = tv_models.mobilenet_v2(weights=tv_models.MobileNet_V2_Weights.DEFAULT)
+    weights = tv_models.MobileNet_V2_Weights.DEFAULT if pretrained else None
+    model = tv_models.mobilenet_v2(weights=weights)
     in_features = model.last_channel  # 1280
     model.classifier = nn.Sequential(
         nn.Dropout(p=dropout_p),
         nn.Linear(in_features, num_classes),
     )
     return model
+
 
