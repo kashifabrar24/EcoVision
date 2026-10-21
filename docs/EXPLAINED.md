@@ -331,3 +331,40 @@ Serves as the definitive, auditable technical report for engineering reviews and
 3. **Q: How does dataset collection methodology (clean white posterboard backgrounds) impact real-world generalizability?**
    - **A:** TrashNet images were captured under controlled laboratory conditions with centered single objects. In real-world recycling facilities or consumer smart bins, objects are crushed, soiled, overlapping, and viewed under varying ambient lighting against cluttered backgrounds. A model trained only on clean studio images experiences domain shift when deployed in the wild unless augmented with in-situ data.
 
+---
+
+## 19. `src/predict.py`
+
+### What it does
+Implements the production inference module for EcoVision with both a CLI (`python src/predict.py path/to/image.jpg`) and a programmatic API (`predict_image(pil_image)`). It mirrors the exact preprocessing pipeline from dataset caching (RGB conversion, direct 224x224 Bilinear resizing without center-cropping, ToTensor, and ImageNet standardization). It loads `models/mobilenetv2_final.pt`, reads the optimized confidence threshold from `models/threshold.json` (0.80), marks predictions below the threshold as UNCERTAIN, and returns full class probability distributions, confidence scores, and top-3 rankings. It also ensures `models/classes.json` is exported.
+
+### Why it exists
+Serves as the core inference engine bridging model training to downstream consumer applications (CLI utilities, API endpoints, and web demo interfaces). It guarantees preprocessing consistency, preventing silent train-serve skew.
+
+### Interview Questions & Answers
+1. **Q: Why is matching the exact preprocessing pipeline (direct Bilinear resize without center crop) critical for inference?**
+   - **A:** Train-serve skew is one of the most common silent failure modes in computer vision systems. If training was conducted on directly resized 224x224 images, introducing an un-trained transformation like center-cropping at inference time would crop out peripheral features (e.g. bottle caps, can lids, box edges) that the network relied on, degrading inference accuracy.
+2. **Q: Why implement caching for model loading (`get_model`) in Python inference code?**
+   - **A:** Instantiating deep learning models and loading multi-megabyte weight tensors into memory or GPU VRAM incurs substantial latency overhead (100–500ms). Caching the model instance globally allows subsequent inference calls to execute in single-digit milliseconds without reloading weights from disk.
+3. **Q: How does the module handle predictions when confidence falls below the threshold?**
+   - **A:** The module flags the output as `uncertain: True` while still reporting the top predicted category and full class probability distribution. This design allows downstream consumers (like smart sorting bins) to safely divert ambiguous items to manual or secondary sorting bins rather than committing an automated sorting error.
+
+---
+
+## 20. `src/measure_latency.py`
+
+### What it does
+Benchmarks model inference latency on both CPU and GPU hardware across 10 warmup and 100 timed iterations. It measures median and 95th percentile (p95) latency for both model-only forward passes and end-to-end processing (image opening, resizing, normalization, and forward pass). It computes model file size (8.75 MB) and parameter count (2,231,558), logging complete benchmark telemetry to `reports/latency.json`.
+
+### Why it exists
+Validates edge deployment feasibility. In practical industrial waste sorting applications, conveyor belts move items past cameras at speeds requiring low latency (e.g. <50ms per item). This script proves that MobileNetV2 satisfies real-time sorting constraints on both GPU (~12ms e2e) and commodity CPU (~24ms e2e).
+
+### Interview Questions & Answers
+1. **Q: Why is `torch.cuda.synchronize()` strictly necessary when measuring GPU latency?**
+   - **A:** PyTorch executes CUDA kernel launches asynchronously on the GPU while the CPU continues executing Python instructions concurrently. If `torch.cuda.synchronize()` is not called before and after timing blocks, Python's wall-clock timer will measure only the negligible CPU kernel dispatch time rather than the actual GPU kernel computation time.
+2. **Q: Why measure both model-only and end-to-end latency?**
+   - **A:** Model-only latency measures theoretical forward-pass compute efficiency, but real-world deployed systems must read image files from sensors/disk, decode JPEG bytes, resize pixels, and convert formats. End-to-end measurement captures I/O and CPU preprocessing overhead, giving an honest appraisal of actual system throughput.
+3. **Q: Why use median and p95 rather than only mean latency?**
+   - **A:** Mean latency is sensitive to transient system spikes (OS context switches, garbage collection pauses, thermal throttling). The median represents typical throughput, while p95 captures tail latency, which dictates service-level agreements (SLAs) in real-time embedded systems.
+
+

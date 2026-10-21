@@ -1,0 +1,52 @@
+{
+  "model_name": "MobileNetV2 Final",
+  "checkpoint_path": "models\\mobilenetv2_final.pt",
+  "file_size_mb": 8.75,
+  "total_parameters": 2231558,
+  "trainable_parameters": 2231558,
+  "benchmark_config": {
+    "num_warmup_runs": 10,
+    "num_timed_runs": 100,
+    "sample_image": "cardboard101.jpg"
+  },
+  "devices": {
+    "gpu": {
+      "device_name": "NVIDIA GeForce RTX 3050 6GB Laptop GPU",
+      "model_only_ms": {
+        "median": 9.22,
+        "p95": 12.38,
+        "mean": 9.69,
+        "std": 1.43,
+        "min": 7.87,
+        "max": 13.82
+      },
+      "end_to_end_ms": {
+        "median": 11.94,
+        "p95": 13.88,
+        "mean": 12.11,
+        "std": 0.84,
+        "min": 10.81,
+        "max": 14.97
+      }
+    },
+    "cpu": {
+      "device_name": "AMD64 Family 25 Model 68 Stepping 1, AuthenticAMD",
+      "model_only_ms": {
+        "median": 22.95,
+        "p95": 31.95,
+        "mean": 23.97,
+        "std": 3.7,
+        "min": 19.8,
+        "max": 44.13
+      },
+      "end_to_end_ms": {
+        "median": 24.38,
+        "p95": 29.38,
+        "mean": 26.15,
+        "std": 11.53,
+        "min": 22.1,
+        "max": 139.01
+      }
+    }
+  }
+}
