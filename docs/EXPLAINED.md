@@ -241,10 +241,38 @@ Fulfills Phase 4 transfer learning requirements, rigorously evaluating whether p
 3. **Q: Why must BatchNorm layers in frozen blocks remain in `eval()` mode during fine-tuning?**
    - **A:** If a BatchNorm layer is left in `train()` mode, it continues to compute running mean and variance from incoming mini-batches. When training on a small dataset with small batch sizes (32), noisy mini-batch statistics corrupt the stable ImageNet statistics embedded in the frozen weights, leading to severe distribution shift and degradation of upstream feature representations.
 
+---
 
+## 14. `src/train_augmentation.py`
 
+### What it does
+Executes the Phase 5 data augmentation comparison experiment for MobileNetV2 on TrashNet. It compares an un-augmented baseline against an augmented configuration across 3 random seeds (42, 43, 44), strictly on the validation set without touching the test set. It trains models using the identical two-stage transfer learning procedure (head training followed by discriminative fine-tuning), tracks validation macro-F1, logs detailed per-run metrics to `reports/augmentation_runs.csv`, calculates summary statistics (mean ± std) in `reports/augmentation_summary.csv`, generates visualizations (`reports/augmentation_effect.png` and `reports/augmentation_gap.png`), selects the best-performing model checkpoint based on validation macro-F1, and saves it to `models/mobilenetv2_final.pt`.
 
+### Why it exists
+Fulfills Phase 5 experimental requirements by empirically measuring the performance delta, error bars, and generalization loss gap resulting from data augmentation. It establishes a rigorous scientific framework to justify whether data augmentation should be included in the final production pipeline.
 
+### Interview Questions & Answers
+1. **Q: Why run the experiment across 3 random seeds instead of just one?**
+   - **A:** Deep learning optimization is inherently stochastic due to random weight initialization, mini-batch sequencing, and non-deterministic CUDA operations. A single run might show an apparent improvement purely due to favorable seed luck. Evaluating across multiple seeds (42, 43, 44) allows calculating mean and standard deviation, verifying that the performance gain (+0.0179 macro-F1) is statistically robust and that every augmented seed strictly outperforms every non-augmented seed.
+2. **Q: Why keep the test split strictly untouched during the augmentation experiment?**
+   - **A:** The test set serves as the final, unbiased holdout dataset used to estimate real-world generalization in Phase 6. If the test set were evaluated during hyperparameter tuning, model comparison, or seed selection, information would leak into the experimental decision process, invalidating the statistical independence and integrity of the final benchmark.
+3. **Q: How does `train_augmentation.py` measure and report the train/validation loss gap?**
+   - **A:** It records the training loss and validation loss at the checkpoint epoch corresponding to the best validation macro-F1. The difference ($\text{Val Loss} - \text{Train Loss}$) quantifies the degree of overfitting. By comparing this gap between configurations (0.2769 for non-augmented vs 0.1918 for augmented), the script empirically proves that data augmentation acts as an effective regularizer, mitigating memorization of training instances.
 
+---
 
+## 15. `docs/AUGMENTATION.md`
 
+### What it does
+Documents the full experimental specification, empirical findings, and model selection decision for Phase 5. It describes the exact augmentation transforms applied, details the rationale for augmenting only the training set, presents complete mean ± std summary and per-seed results tables, analyzes the impact on macro-F1, loss gap, training time, and per-class performance, announces the selection of MobileNetV2 Augmentation Seed 44 as the final model (`mobilenetv2_final.pt`), and outlines honest scientific caveats (sample size, single validation split, minority class volatility, and validation selection bias).
+
+### Why it exists
+Serves as the authoritative, permanent record of the Phase 5 experiment. It adheres to Rule 2 ("NEVER invent numbers. Every number in README/REPORT must come from files your code saved in reports/") by pulling all figures directly from saved CSV reports, providing complete transparency and auditability for recruiters and technical reviewers.
+
+### Interview Questions & Answers
+1. **Q: Why apply data augmentation strictly to the training set and never to the validation or test sets?**
+   - **A:** The validation and test sets must accurately reflect the uncorrupted, real-world data distribution that the model will encounter in deployment. Augmenting evaluation sets introduces synthetic artifacts (e.g. artificial color shifts, aggressive crops) and random variance into the benchmarks, corrupting evaluation integrity. Augmentation is an optimization-time regularization technique designed to force the network to learn invariant representations from diverse training views.
+2. **Q: Why did the minority `trash` class experience the largest F1 improvement (+0.0646) under augmentation?**
+   - **A:** With only 137 total unique images in TrashNet (and ~96 in train), the model has very few physical examples to learn the wide intra-class diversity of miscellaneous waste. Data augmentation (rotations, flips, color jitter, and random resized crops) synthesizes novel perspectives and lighting variations, drastically enriching the effective sample density for minority classes where feature sparsity is most severe.
+3. **Q: Why is selecting the best model seed based on validation performance slightly optimistic, and how is this addressed?**
+   - **A:** Choosing the top-performing seed on validation (Seed 44 with macro-F1 = 0.9221) introduces a mild selection bias known as the "winner's curse," because the selected model may have benefited from favorable sample alignment on that specific validation set. This caveat is acknowledged openly in scientific reporting, and the holdout test set in Phase 6 serves as the definitive, unbiased arbiter of true model performance.

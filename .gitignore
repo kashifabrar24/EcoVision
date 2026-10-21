@@ -35,3 +35,6 @@ Desktop.ini
 
 # Hugging Face cache if stored locally
 .cache/
+
+# Intermediate seed checkpoints (keep baseline_cnn.pt, mobilenetv2_transfer.pt, mobilenetv2_final.pt tracked)
+models/*_seed*.pt
