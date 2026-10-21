@@ -84,3 +84,22 @@ All figures and findings are verifiable from the code-generated artifacts stored
 - `reports/class_imbalance_hf_mirror_doubled.png`: Doubled mirror distribution chart archive.
 - `reports/sample_grid.png`: High-resolution representative sample image grid.
 - `reports/removed_images.csv`: Log of removed cross-class duplicate images with conflicting labels.
+- `reports/cross_class_pairs.png`: Side-by-side comparison of cross-class pairs with pHash distance <= 4.
+- `reports/near_duplicates_borderline.png`: Grid of borderline near-duplicate pairs at Hamming distances 3 and 4.
+- `reports/near_duplicates_metrics.json`: Threshold evaluation across Hamming distances 0, 2, 4, and 6.
+
+---
+
+## 6. Near-Duplicate Analysis & Known Limitations
+
+### Cross-Class Pair Inspection (Threshold <= 4)
+At Hamming distance <= 4, exactly 2 cross-class pairs were identified:
+1. `metal154.jpg` (metal) vs `plastic10.jpg` (plastic) — Hamming distance = 4
+2. `metal159.jpg` (metal) vs `plastic11.jpg` (plastic) — Hamming distance = 2
+
+Visual inspection (`reports/cross_class_pairs.png`) confirms that in both pairs, the items are clearly different physical objects (a metal soda can vs. a clear plastic water bottle) placed horizontally on the same white posterboard background. They are retained in the dataset because neither represents a labeling error or duplicate photograph; their pHash similarity arises from the dominance of the blank white background and roughly aligned silhouettes in low-frequency DCT space. By grouping them together, our Stratified Group Split guarantees both items in each pair remain in the same split, preventing any risk of leakage.
+
+### Known Limitations
+1. **Perceptual Hash Invariance Limits:** Perceptual hashing (pHash) cannot detect the same object photographed from significantly different camera angles, orientations, or under shifted lighting. Consequently, if the benchmark contains multi-angle shots of identical items that exceed distance 4, some cross-split leakage may remain, meaning validation/test accuracy could be slightly optimistic compared to real-world deployment on unseen objects.
+2. **False Merges on Plain Backgrounds:** Because all TrashNet photos share identical white posterboard backgrounds, pHash can occasionally merge different small objects that share similar silhouettes (e.g. cans and bottles). While this is completely harmless for preventing data leakage (it merely forces both objects into the same split), it means some group clusters represent false merges rather than true duplicates.
+

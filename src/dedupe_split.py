@@ -230,15 +230,42 @@ def run_dedupe_and_split():
     df_clean.loc[df_clean["group_id"].isin(val_gids), "split"] = "val"
     df_clean.loc[df_clean["group_id"].isin(test_gids), "split"] = "test"
 
-    # Strict Assertions
-    assert len(train_gids.intersection(val_gids)) == 0, "Leakage: group overlap between train and val!"
-    assert len(train_gids.intersection(test_gids)) == 0, "Leakage: group overlap between train and test!"
-    assert len(val_gids.intersection(test_gids)) == 0, "Leakage: group overlap between val and test!"
+    # Strict Real Verification Assertions
+    split_map = dict(zip(df_clean["filename"], df_clean["split"]))
+
+    # 1. Pairwise check: EVERY pair with pHash Hamming distance <= chosen_threshold must share the same split
+    leakage_pairs = []
+    for d in range(chosen_threshold + 1):
+        for i, j in pairs_by_dist[d]:
+            f1, f2 = df_clean.iloc[i]["filename"], df_clean.iloc[j]["filename"]
+            s1, s2 = split_map[f1], split_map[f2]
+            if s1 != s2:
+                leakage_pairs.append((d, f1, s1, f2, s2))
+    assert len(leakage_pairs) == 0, f"Perceptual hash leakage found across splits: {leakage_pairs}"
+
+    # 2. Filename uniqueness across splits
+    train_files = set(df_clean[df_clean["split"] == "train"]["filename"])
+    val_files = set(df_clean[df_clean["split"] == "val"]["filename"])
+    test_files = set(df_clean[df_clean["split"] == "test"]["filename"])
+    assert len(train_files.intersection(val_files)) == 0, "Filename overlap between train and val!"
+    assert len(train_files.intersection(test_files)) == 0, "Filename overlap between train and test!"
+    assert len(val_files.intersection(test_files)) == 0, "Filename overlap between val and test!"
+
+    # 3. MD5 uniqueness across splits
+    train_md5s = set(df_clean[df_clean["split"] == "train"]["md5"])
+    val_md5s = set(df_clean[df_clean["split"] == "val"]["md5"])
+    test_md5s = set(df_clean[df_clean["split"] == "test"]["md5"])
+    assert len(train_md5s.intersection(val_md5s)) == 0, "MD5 hash overlap between train and val!"
+    assert len(train_md5s.intersection(test_md5s)) == 0, "MD5 hash overlap between train and test!"
+    assert len(val_md5s.intersection(test_md5s)) == 0, "MD5 hash overlap between val and test!"
+
+    # 4. Total counts and no unassigned images
     assert (df_clean["split"] != "none").all(), "Unassigned samples found!"
+    assert len(df_clean) == 2521, f"Expected 2,521 clean images, got {len(df_clean)}"
 
     crosstab = pd.crosstab(df_clean["label_name"], df_clean["split"])
     assert (crosstab > 0).all().all(), "Every class must be present in every split!"
-    print("      Verification passed: Zero group leakage, all classes present in all splits.")
+    print("      Verification passed: All pairwise pHash (<=4), filename, and MD5 leak checks succeeded.")
 
     # Save split CSVs
     train_df = df_clean[df_clean["split"] == "train"].copy()

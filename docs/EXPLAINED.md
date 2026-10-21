@@ -164,6 +164,25 @@ Enforces Phase 2 requirements: preventing data contamination across splits, ensu
 3. **Q: Why pre-cache resized 224×224 images to disk rather than resizing on the fly in `Dataset.__getitem__`?**
    - **A:** On-the-fly resizing from 512×384 adds significant CPU overhead to every training epoch, causing GPU starvation on Windows with single-threaded data loading (`num_workers=0`). Pre-caching ensures ultra-fast I/O during model training.
 
+---
+
+## 10. `src/inspect_pairs.py`
+
+### What it does
+Identifies and visualizes the cross-class image pairs within perceptual hash (pHash) Hamming distance <= 4, saving them side-by-side to `reports/cross_class_pairs.png`, and extracts borderline near-duplicate pairs at Hamming distances 3 and 4 into `reports/near_duplicates_borderline.png`.
+
+### Why it exists
+Provides empirical verification of the chosen pHash threshold (<= 4). It confirms that the 2 cross-class pairs (`metal154` vs `plastic10`, `metal159` vs `plastic11`) are different physical objects (can vs. bottle) whose hashes overlap due to white posterboard backgrounds, justifying keeping both items in the dataset under the same group ID. It also demonstrates how the threshold handles borderline cases.
+
+### Interview Questions & Answers
+1. **Q: Why do metal cans and plastic bottles have low pHash distances despite being different materials?**
+   - **A:** Perceptual hash computes a DCT on a downscaled 32x32 grayscale image and keeps only low-frequency components. A cylindrical soda can and a plastic water bottle centered horizontally on a pure white background share virtually identical low-frequency energy profiles, resulting in small Hamming distances (2 to 4).
+2. **Q: Why keep these cross-class pairs instead of deleting them like the exact duplicates?**
+   - **A:** The 3 removed pairs were identical pixel photos labeled with two contradictory classes (genuine labeling errors). In contrast, `metal159` and `plastic11` are physically distinct waste items with correct labels. Deleting them would throw away valid data simply because low-frequency hashing cannot differentiate cylindrical shapes. Grouping them preserves data integrity and prevents train/val/test leakage.
+3. **Q: Why inspect borderline pairs at distance 3 and 4 rather than only distance 0?**
+   - **A:** Distance 0 only shows exact or near-identical images. The hardest cases and highest risk of false merges or missed duplicates occur at the threshold boundary (3 and 4). Visual inspection of the borderline pairs proves that threshold 4 captures meaningful similarities without collapsing unrelated images into mega-clusters.
+
+
 
 
 
