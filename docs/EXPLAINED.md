@@ -139,7 +139,7 @@ Provides the formal data specification for the EcoVision project, documenting th
 Fulfills Phase 1 documentation deliverables and equips recruitment reviewers with a complete, verifiable reference explaining why the dataset has 5,054 rows on Hugging Face versus 2,527 on GitHub, and how class imbalance and label noise will be handled in subsequent phases.
 
 ### Interview Questions & Answers
-1. **Q: Why is the 4.33:1 class imbalance between paper (23.51%) and trash (5.42%) problematic for evaluation?**
+1. **Q: Why is the 4.34:1 class imbalance between paper (23.51%) and trash (5.42%) problematic for evaluation?**
    - **A:** If evaluated using overall accuracy alone, an algorithm could predict the majority class and achieve ~75-80% accuracy while failing 100% of the time on miscellaneous trash. Macro-averaged metrics (macro-F1) weight all classes equally, exposing poor performance on minority classes.
 2. **Q: How does the discovery of cross-class duplicates (e.g. `glass115.jpg` and `metal91.jpg`) affect model training?**
    - **A:** Cross-class duplicates represent conflicting label noise. If identical images are assigned contradictory labels, the loss function penalizes correct predictions and confuses gradients. In addition, if duplicates land in different splits, test set leakage occurs.
