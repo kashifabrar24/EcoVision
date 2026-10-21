@@ -1,0 +1,50 @@
+{
+  "model": "MobileNetV2_Transfer",
+  "total_parameters": 2231558,
+  "trainable_parameters_stage1": 7686,
+  "trainable_parameters_stage2": 1213766,
+  "best_stage": 2,
+  "best_epoch": 7,
+  "total_training_time_seconds": 119.08,
+  "val_loss": 0.3191,
+  "val_accuracy": 0.905,
+  "val_macro_f1": 0.8988,
+  "per_class": {
+    "cardboard": {
+      "precision": 1.0,
+      "recall": 0.9167,
+      "f1_score": 0.9565,
+      "support": 60
+    },
+    "glass": {
+      "precision": 0.8961,
+      "recall": 0.92,
+      "f1_score": 0.9079,
+      "support": 75
+    },
+    "metal": {
+      "precision": 0.8615,
+      "recall": 0.9032,
+      "f1_score": 0.8819,
+      "support": 62
+    },
+    "paper": {
+      "precision": 0.9222,
+      "recall": 0.9326,
+      "f1_score": 0.9274,
+      "support": 89
+    },
+    "plastic": {
+      "precision": 0.863,
+      "recall": 0.875,
+      "f1_score": 0.869,
+      "support": 72
+    },
+    "trash": {
+      "precision": 0.8947,
+      "recall": 0.8095,
+      "f1_score": 0.85,
+      "support": 21
+    }
+  }
+}

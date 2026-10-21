@@ -187,18 +187,20 @@ Provides empirical verification of the chosen pHash threshold (<= 4). It confirm
 ## 11. `src/models.py`
 
 ### What it does
-Defines the PyTorch neural network architectures for EcoVision, specifically `BaselineCNN`: a small convolutional neural network built from scratch containing 4 convolutional blocks (each comprising `Conv2d` -> `BatchNorm2d` -> `ReLU` -> `MaxPool2d`), followed by Global Average Pooling (`AdaptiveAvgPool2d((1, 1))`), Dropout (`p=0.3`), and a 6-class linear classification head (~390k trainable parameters).
+Defines the PyTorch neural network architectures for EcoVision:
+1. `BaselineCNN`: A small 4-block convolutional neural network built from scratch (Conv2d -> BatchNorm2d -> ReLU -> MaxPool2d), followed by Global Average Pooling, Dropout (0.3), and a 6-class linear classification head (~390k parameters).
+2. `create_mobilenetv2_transfer`: Builder function that loads ImageNet-pretrained `MobileNetV2` from `torchvision.models` and adapts it for EcoVision by replacing the default 1000-class classifier head with `Dropout(p=0.3)` and `Linear(1280, 6)`. Total parameters: ~2.23M.
 
 ### Why it exists
-Establishes an empirical, unconfounded baseline for waste image classification trained entirely from scratch. This acts as the scientific anchor to quantify the true benefits of transfer learning (Phase 4) and data augmentation (Phase 5).
+Centralizes model definitions across phases into a single, clean module. It ensures model instantiation is strictly reproducible, modular, and directly importable by training pipelines and deployment interfaces alike.
 
 ### Interview Questions & Answers
-1. **Q: Why place Batch Normalization after Conv2d and before ReLU?**
-   - **A:** Batch Normalization standardizes intermediate feature map distributions across mini-batches, stabilizing training dynamics, smoothing the optimization landscape, and allowing faster convergence with higher learning rates (such as `1e-3`).
-2. **Q: Why use Global Average Pooling (GAP) instead of flattening dense layers?**
-   - **A:** Flattening high-dimensional feature maps into dense layers requires millions of parameters, creating massive memory overhead and severe susceptibility to overfitting. GAP reduces spatial dimensions to 1x1 averages, creating a robust, translation-invariant vector fed directly into the classification head with minimal parameters.
-3. **Q: Why train a CNN from scratch as a baseline rather than jumping immediately to pretrained models like ResNet or ConvNeXt?**
-   - **A:** A baseline from scratch evaluates the dataset's intrinsic learnability under identical split conditions. Without a scratch baseline, it is impossible to scientifically isolate how much performance gain comes from dataset quality versus pretrained ImageNet feature representations.
+1. **Q: What is an Inverted Residual Block with Linear Bottleneck in MobileNetV2?**
+   - **A:** Unlike standard ResNet blocks that compress channels then expand them (narrow-wide-narrow), MobileNetV2 expands channels using 1x1 convolutions into high-dimensional space, applies a lightweight 3x3 depthwise separable convolution, and projects back down to a low-dimensional bottleneck without a non-linear activation (linear bottleneck). This preserves information manifold integrity while drastically minimizing compute and memory footprint.
+2. **Q: Why choose MobileNetV2 over heavier backbones like ResNet50 or ViT for this recruitment task?**
+   - **A:** TrashNet has only ~1,763 training images. Heavy models with 25M+ parameters risk severe overfitting, high latency, and heavy VRAM usage. MobileNetV2 has only ~2.2M parameters and low latency, making it ideal for edge deployment (e.g. smart recycling bins) while offering rich ImageNet semantic representations.
+3. **Q: Why use Global Average Pooling (GAP) before the classifier?**
+   - **A:** GAP converts each spatial feature map ($H \times W$) into a single scalar average. This enforces translation invariance, prevents spatial overfitting, and avoids the parameter explosion of large dense fully connected layers.
 
 ---
 
@@ -217,6 +219,28 @@ Fulfills Phase 3 modeling requirements while strictly adhering to core ML princi
    - **A:** TrashNet exhibits a 4.34:1 class imbalance, where the `trash` category represents only 5.4% of samples. A model could achieve high accuracy or lower overall loss while predicting poorly on minority classes. Macro-F1 weights all classes equally, stopping training when performance across all categories—especially rare classes—is maximized.
 3. **Q: Why is data augmentation explicitly disabled in this phase?**
    - **A:** Scientific rigor requires isolating experimental variables. Disabling augmentation in Phase 3 establishes the true baseline performance on the raw processed data. When augmentation is evaluated in Phase 5, any improvement can be directly attributed to augmentation techniques rather than confounded model changes.
+
+---
+
+## 13. `src/train_transfer.py`
+
+### What it does
+Executes the two-stage transfer learning pipeline with ImageNet-pretrained MobileNetV2:
+- **Stage 1 (Feature Extraction):** Completely freezes the backbone (`requires_grad=False`), training only the new 6-class classification head with Adam (`lr=1e-3`, max 10 epochs, patience 3 on validation macro-F1).
+- **Stage 2 (Fine-Tuning):** Loads best Stage 1 weights, unfreezes the last 3 inverted-residual blocks of the backbone (`features[-3:]`), keeps BatchNorm layers of all frozen blocks in `eval()` mode, and fine-tunes using discriminative learning rates (`1e-4` for backbone blocks, `1e-3` for head) with Adam (max 20 epochs, patience 5 on validation macro-F1).
+Saves the best checkpoint to `models/mobilenetv2_transfer.pt`, logs per-stage history to `reports/transfer_history.csv`, plots transition curves to `reports/transfer_curves.png`, generates side-by-side validation confusion matrices in `reports/val_confusion_matrices.png`, and outputs a comparative benchmark against the baseline in `reports/baseline_vs_transfer_val.csv`.
+
+### Why it exists
+Fulfills Phase 4 transfer learning requirements, rigorously evaluating whether pre-trained visual representations from ImageNet solve waste material classification significantly better than learning from scratch, while demonstrating proper two-stage fine-tuning discipline.
+
+### Interview Questions & Answers
+1. **Q: What is transfer learning and why is it effective for small datasets like TrashNet?**
+   - **A:** Transfer learning leverages representations learned by a neural network trained on a massive source dataset (like ImageNet with 1.2M images) and applies them to a different target task. Low- and mid-level convolutional features (edges, textures, surfaces, geometric contours) are largely universal across natural images. Reusing these pre-learned filters prevents overfitting on small datasets where training deep filters from scratch is statistically constrained.
+2. **Q: Why freeze the backbone in Stage 1 before fine-tuning in Stage 2?**
+   - **A:** The newly initialized classification head has random weights. If the entire network were trained immediately with high learning rates, massive gradient updates from the random head would backpropagate through the backbone and destroy ("catastrophically overwrite") the carefully learned pretrained feature detectors. Freezing the backbone allows the head to align with pretrained features first; only then is gentle fine-tuning applied.
+3. **Q: Why must BatchNorm layers in frozen blocks remain in `eval()` mode during fine-tuning?**
+   - **A:** If a BatchNorm layer is left in `train()` mode, it continues to compute running mean and variance from incoming mini-batches. When training on a small dataset with small batch sizes (32), noisy mini-batch statistics corrupt the stable ImageNet statistics embedded in the frozen weights, leading to severe distribution shift and degradation of upstream feature representations.
+
 
 
 
