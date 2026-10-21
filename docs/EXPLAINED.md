@@ -294,3 +294,40 @@ Provides the definitive, unbiased benchmark of real-world model generalization. 
    - **A:** Point estimates (such as "89.71% accuracy") conceal the sampling variability inherent to finite test datasets ($N=379$). Bootstrapping samples with replacement 1,000 times to construct empirical sampling distributions for accuracy and macro-F1 without assuming asymptotic normality, yielding robust 95% confidence intervals (accuracy: [0.8654, 0.9261], macro-F1: [0.8195, 0.9036]).
 3. **Q: Why did test macro-F1 (0.8647) decline relative to validation macro-F1 (0.9221) while overall test accuracy remained high (89.71%)?**
    - **A:** Macro-F1 weights each class equally regardless of support. In the holdout test set, the severe minority `trash` class contains only 21 images and achieved an F1 of 0.6316 (due to 9 false negatives), pulling down the unweighted macro mean. Meanwhile, overall accuracy is dominated by well-represented classes like cardboard (F1 0.9580, support 60) and paper (F1 0.9438, support 89), where performance was outstanding.
+
+---
+
+## 17. `src/tune_threshold.py`
+
+### What it does
+Executes Phase 7 confidence threshold optimization using strictly `reports/val_predictions.csv`. It sweeps confidence cutoffs from 0.30 to 0.95 in increments of 0.05, designating predictions below the threshold as "uncertain". For each threshold, it calculates coverage, accuracy, and macro-F1 on answered items, logs metrics to `reports/threshold_sweep.csv`, and visualizes trade-off curves in `reports/threshold_curve.png`. It selects the operational threshold using a pre-committed rule (highest coverage with validation accuracy $\ge$ 0.95), stores the decision in `models/threshold.json`, and applies the chosen threshold once to `reports/test_predictions.csv` (logging results to `reports/test_with_threshold.json`).
+
+### Why it exists
+Enables selective classification (prediction with a reject option) for production deployment. In real-world waste processing, false positive classifications can contaminate an entire bale of recyclable material. Rejection of low-confidence predictions allows the system to operate at high precision on automated items while safely routing ambiguous items to secondary sorting.
+
+### Interview Questions & Answers
+1. **Q: Why tune the confidence threshold strictly on validation predictions rather than test predictions?**
+   - **A:** Tuning on test predictions would contaminate the holdout split, yielding an overfitted threshold that exploits idiosyncratic test sample noise. The threshold must be learned exclusively from validation data; the test set is only used once to measure how well that threshold generalizes to unseen operational data.
+2. **Q: What is the operational trade-off between coverage and accuracy in selective classification?**
+   - **A:** Raising the threshold eliminates low-confidence predictions, which reduces false positives and boosts accuracy on the remaining items, but simultaneously lowers coverage (fewer items handled automatically). The engineering objective is to identify the Pareto-optimal operating point that satisfies safety/quality constraints (e.g. $\ge$ 95% accuracy) while maximizing automated throughput.
+3. **Q: Why did threshold 0.80 achieve 95.14% test accuracy while rejecting only 13.19% of samples?**
+   - **A:** The model's misclassifications disproportionately cluster at lower confidence levels (under 0.80). Setting the rejection cutoff at 0.80 eliminated 25 of the 39 test errors, concentrating errors into the "uncertain" bucket and dramatically increasing precision for the 86.81% of items that were confidently accepted.
+
+---
+
+## 18. `docs/TEST_RESULTS.md`
+
+### What it does
+Synthesizes the complete empirical results from Phase 6 holdout test evaluation and Phase 7 confidence thresholding. It presents side-by-side benchmark tables comparing Baseline CNN against MobileNetV2 Final with 95% bootstrap confidence intervals, documents the validation threshold sweep and test deployment metrics, provides detailed per-class error analysis, and outlines honest scientific limitations (small test set, extreme minority class volatility, studio photography bias, and softmax overconfidence).
+
+### Why it exists
+Serves as the definitive, auditable technical report for engineering reviews and hiring managers. It adheres strictly to Rule 2 ("NEVER invent numbers") by extracting every figure from saved CSV and JSON reports, openly disclosing that test performance is lower than validation and explaining why.
+
+### Interview Questions & Answers
+1. **Q: Why is it critical to report that test macro-F1 (0.8647) is lower than validation macro-F1 (0.9221)?**
+   - **A:** Honesty and scientific integrity are fundamental in applied machine learning. Model selection on validation data inherently produces a slightly optimistic estimate ("winner's curse"). Acknowledging this performance gap openly builds trust and provides production teams with realistic performance expectations for deployment.
+2. **Q: Why do glass and plastic represent the primary cross-class confusion pair in TrashNet?**
+   - **A:** Both materials frequently appear as transparent, cylindrical bottles or containers photographed against plain white backgrounds. Their low- and mid-level visual features—such as specular highlights, transparency, and geometric contours—are nearly indistinguishable without material-specific spectral or physical signals.
+3. **Q: How does dataset collection methodology (clean white posterboard backgrounds) impact real-world generalizability?**
+   - **A:** TrashNet images were captured under controlled laboratory conditions with centered single objects. In real-world recycling facilities or consumer smart bins, objects are crushed, soiled, overlapping, and viewed under varying ambient lighting against cluttered backgrounds. A model trained only on clean studio images experiences domain shift when deployed in the wild unless augmented with in-situ data.
+

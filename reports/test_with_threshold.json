@@ -1,0 +1,17 @@
+{
+  "chosen_threshold": 0.8,
+  "selection_rule": "Highest coverage with validation accuracy >= 0.95",
+  "test": {
+    "threshold": 0.8,
+    "coverage": 0.8681,
+    "accuracy": 0.9514,
+    "macro_f1": 0.9231,
+    "num_answered": 329,
+    "num_rejected": 50,
+    "total_samples": 379
+  },
+  "raw_test_baseline": {
+    "accuracy": 0.8971,
+    "macro_f1": 0.8647
+  }
+}
