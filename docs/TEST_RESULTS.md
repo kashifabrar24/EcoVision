@@ -68,7 +68,7 @@ Applying threshold **0.80** once to the holdout test set without modification yi
 - **Test Macro-F1 on Answered:** **0.9231** (compared to raw test macro-F1 of 0.8647, a gain of **+0.0584**)
 - **Rejected Fraction:** **13.19%** (50 images routed to manual inspection or secondary sorting)
 
-*Key Insight:* The confidence threshold successfully filtered out 25 of the 39 test errors, pushing operational accuracy from 89.71% above the target 95% threshold (95.14%) while retaining over 86% automated throughput.
+*Key Insight:* The confidence threshold successfully removed 23 of the 39 test errors (while rejecting 27 correct images), pushing operational accuracy on answered images from 89.71% to 95.14% while retaining 86.81% automated throughput.
 
 ---
 
@@ -105,6 +105,6 @@ To ensure honest deployment guidance and prevent misrepresentation of capability
 3. **Studio Photography Bias (Domain Shift Risk):**
    - All TrashNet photos feature individual waste objects placed against uniform white posterboard under consistent indoor lighting. Real recycling conveyor belts or consumer disposal bins exhibit heavy occlusions, cluttered multi-object piles, crushed shapes, and dirty backgrounds. Performance in in-the-wild deployment is expected to degrade unless fine-tuned on real-world stream data.
 4. **Near-Duplicate Grouping Limitations:**
-   - Although Phase 2 implemented Stratified GROUP Splitting at perceptual hash distance $\le 4$ to eliminate duplicate leakage, subtle background cues or uncaptured camera bursts from the original collection could still share slight distributional similarities across splits.
+   - Although Phase 2 implemented Stratified GROUP Splitting at perceptual hash distance $\le 4$ to minimize near-duplicate leakage, near-duplicate leakage is not fully excluded, and subtle background cues or uncaptured camera bursts from the original collection could still share slight distributional similarities across splits.
 5. **Softmax Overconfidence:**
-   - Standard softmax outputs are notoriously uncalibrated. Several misclassified samples exhibited high confidence scores ($>0.90$) due to extreme logit scaling. While confidence thresholding at 0.80 eliminated 64% of errors, temperature scaling or conformal prediction should be explored in future production iterations.
+   - Standard softmax outputs are notoriously uncalibrated. Several misclassified samples exhibited high confidence scores ($>0.90$) due to extreme logit scaling. While confidence thresholding at 0.80 removed 23 of 39 errors (58.97%), temperature scaling or conformal prediction should be explored in future edge deployment iterations.

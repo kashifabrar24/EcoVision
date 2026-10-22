@@ -107,7 +107,7 @@ Prevents silent network hangs, rate-limit bottlenecks, or socket timeouts when f
    - **A:** Large downloads over consumer networks can be interrupted by transient disconnects. Range headers allow resuming downloads from the exact byte offset where they stopped rather than starting from zero.
 2. **Q: How does this script integrate with the Hugging Face `datasets` library?**
    - **A:** It places the downloaded archive into the exact cache blob path expected by `huggingface_hub` and links it into the repository snapshot, making `load_dataset('garythung/trashnet')` find it as a cache hit.
-3. **Q: Why is telemetry (MB/s and ETA) essential in production ML data pipelines?**
+3. **Q: Why is telemetry (MB/s and ETA) essential in large ML data pipelines?**
    - **A:** Telemetry gives observability into bandwidth bottlenecks and enables early detection of stalled TCP sessions rather than allowing automated pipelines to block indefinitely.
 
 ---
@@ -154,7 +154,7 @@ Fulfills Phase 1 documentation deliverables and equips recruitment reviewers wit
 Restricts processing strictly to the 2,527 unique resized images, removes the 3 conflicting duplicate pairs (6 images) by filename logging them to `reports/removed_images.csv`, analyzes near-duplicate Hamming distance thresholds (0, 2, 4, 6), groups near-duplicates via connected components, executes a leak-proof Stratified GROUP Split (70% train, 15% val, 15% test, seed 42), and caches 224×224 images to `data/processed/`.
 
 ### Why it exists
-Enforces Phase 2 requirements: preventing data contamination across splits, ensuring zero leakage of near-duplicate shots, verifying minority class representation across all splits, and preprocessing images to the standard 224×224 input resolution for CNN training.
+Enforces Phase 2 requirements: grouping near-duplicate shots to reduce data contamination across splits (though near-duplicate leakage cannot be fully excluded), verifying minority class representation across all splits, and preprocessing images to the standard 224×224 input resolution for CNN training.
 
 ### Interview Questions & Answers
 1. **Q: Why is Stratified GROUP Split necessary instead of standard stratified random splitting?**
@@ -249,11 +249,11 @@ Fulfills Phase 4 transfer learning requirements, rigorously evaluating whether p
 Executes the Phase 5 data augmentation comparison experiment for MobileNetV2 on TrashNet. It compares an un-augmented baseline against an augmented configuration across 3 random seeds (42, 43, 44), strictly on the validation set without touching the test set. It trains models using the identical two-stage transfer learning procedure (head training followed by discriminative fine-tuning), tracks validation macro-F1, logs detailed per-run metrics to `reports/augmentation_runs.csv`, calculates summary statistics (mean ± std) in `reports/augmentation_summary.csv`, generates visualizations (`reports/augmentation_effect.png` and `reports/augmentation_gap.png`), selects the best-performing model checkpoint based on validation macro-F1, and saves it to `models/mobilenetv2_final.pt`.
 
 ### Why it exists
-Fulfills Phase 5 experimental requirements by empirically measuring the performance delta, error bars, and generalization loss gap resulting from data augmentation. It establishes a rigorous scientific framework to justify whether data augmentation should be included in the final production pipeline.
+Fulfills Phase 5 experimental requirements by empirically measuring the performance delta, error bars, and generalization loss gap resulting from data augmentation. It establishes a rigorous scientific framework to justify whether data augmentation should be included in the final model pipeline.
 
 ### Interview Questions & Answers
 1. **Q: Why run the experiment across 3 random seeds instead of just one?**
-   - **A:** Deep learning optimization is inherently stochastic due to random weight initialization, mini-batch sequencing, and non-deterministic CUDA operations. A single run might show an apparent improvement purely due to favorable seed luck. Evaluating across multiple seeds (42, 43, 44) allows calculating mean and standard deviation, verifying that the performance gain (+0.0179 macro-F1) is statistically robust and that every augmented seed strictly outperforms every non-augmented seed.
+   - **A:** Deep learning optimization is inherently stochastic due to random weight initialization, mini-batch sequencing, and non-deterministic CUDA operations. A single run might show an apparent improvement purely due to favorable seed luck. Evaluating across multiple seeds (42, 43, 44) allows calculating mean and standard deviation, verifying that the performance gain (+0.0179 macro-F1) is consistent across 3 seeds and that every augmented seed strictly outperforms every non-augmented seed (though 3 seeds is a small sample).
 2. **Q: Why keep the test split strictly untouched during the augmentation experiment?**
    - **A:** The test set serves as the final, unbiased holdout dataset used to estimate real-world generalization in Phase 6. If the test set were evaluated during hyperparameter tuning, model comparison, or seed selection, information would leak into the experimental decision process, invalidating the statistical independence and integrity of the final benchmark.
 3. **Q: How does `train_augmentation.py` measure and report the train/validation loss gap?**
@@ -303,7 +303,7 @@ Provides the definitive, unbiased benchmark of real-world model generalization. 
 Executes Phase 7 confidence threshold optimization using strictly `reports/val_predictions.csv`. It sweeps confidence cutoffs from 0.30 to 0.95 in increments of 0.05, designating predictions below the threshold as "uncertain". For each threshold, it calculates coverage, accuracy, and macro-F1 on answered items, logs metrics to `reports/threshold_sweep.csv`, and visualizes trade-off curves in `reports/threshold_curve.png`. It selects the operational threshold using a pre-committed rule (highest coverage with validation accuracy $\ge$ 0.95), stores the decision in `models/threshold.json`, and applies the chosen threshold once to `reports/test_predictions.csv` (logging results to `reports/test_with_threshold.json`).
 
 ### Why it exists
-Enables selective classification (prediction with a reject option) for production deployment. In real-world waste processing, false positive classifications can contaminate an entire bale of recyclable material. Rejection of low-confidence predictions allows the system to operate at high precision on automated items while safely routing ambiguous items to secondary sorting.
+Enables selective classification (prediction with a reject option) for automated deployment. In real-world waste processing, false positive classifications can contaminate an entire bale of recyclable material. Rejection of low-confidence predictions allows the system to operate at high precision on automated items while safely routing ambiguous items to secondary sorting.
 
 ### Interview Questions & Answers
 1. **Q: Why tune the confidence threshold strictly on validation predictions rather than test predictions?**
@@ -311,7 +311,7 @@ Enables selective classification (prediction with a reject option) for productio
 2. **Q: What is the operational trade-off between coverage and accuracy in selective classification?**
    - **A:** Raising the threshold eliminates low-confidence predictions, which reduces false positives and boosts accuracy on the remaining items, but simultaneously lowers coverage (fewer items handled automatically). The engineering objective is to identify the Pareto-optimal operating point that satisfies safety/quality constraints (e.g. $\ge$ 95% accuracy) while maximizing automated throughput.
 3. **Q: Why did threshold 0.80 achieve 95.14% test accuracy while rejecting only 13.19% of samples?**
-   - **A:** The model's misclassifications disproportionately cluster at lower confidence levels (under 0.80). Setting the rejection cutoff at 0.80 eliminated 25 of the 39 test errors, concentrating errors into the "uncertain" bucket and dramatically increasing precision for the 86.81% of items that were confidently accepted.
+   - **A:** The model's misclassifications disproportionately cluster at lower confidence levels (under 0.80). Setting the rejection cutoff at 0.80 removed 23 of the 39 test errors (while rejecting 27 correct predictions), concentrating errors into the "uncertain" bucket and increasing precision for the 86.81% of items that were confidently accepted.
 
 ---
 
@@ -325,7 +325,7 @@ Serves as the definitive, auditable technical report for engineering reviews and
 
 ### Interview Questions & Answers
 1. **Q: Why is it critical to report that test macro-F1 (0.8647) is lower than validation macro-F1 (0.9221)?**
-   - **A:** Honesty and scientific integrity are fundamental in applied machine learning. Model selection on validation data inherently produces a slightly optimistic estimate ("winner's curse"). Acknowledging this performance gap openly builds trust and provides production teams with realistic performance expectations for deployment.
+   - **A:** Honesty and scientific integrity are fundamental in applied machine learning. Model selection on validation data inherently produces a slightly optimistic estimate ("winner's curse"). Acknowledging this performance gap openly builds trust and provides realistic performance expectations for deployment.
 2. **Q: Why do glass and plastic represent the primary cross-class confusion pair in TrashNet?**
    - **A:** Both materials frequently appear as transparent, cylindrical bottles or containers photographed against plain white backgrounds. Their low- and mid-level visual features—such as specular highlights, transparency, and geometric contours—are nearly indistinguishable without material-specific spectral or physical signals.
 3. **Q: How does dataset collection methodology (clean white posterboard backgrounds) impact real-world generalizability?**
@@ -336,7 +336,7 @@ Serves as the definitive, auditable technical report for engineering reviews and
 ## 19. `src/predict.py`
 
 ### What it does
-Implements the production inference module for EcoVision with both a CLI (`python src/predict.py path/to/image.jpg`) and a programmatic API (`predict_image(pil_image)`). It mirrors the exact preprocessing pipeline from dataset caching (RGB conversion, direct 224x224 Bilinear resizing without center-cropping, ToTensor, and ImageNet standardization). It loads `models/mobilenetv2_final.pt`, reads the optimized confidence threshold from `models/threshold.json` (0.80), marks predictions below the threshold as UNCERTAIN, and returns full class probability distributions, confidence scores, and top-3 rankings. It also ensures `models/classes.json` is exported.
+Implements the inference module for EcoVision with both a CLI (`python src/predict.py path/to/image.jpg`) and a programmatic API (`predict_image(pil_image)`). It mirrors the exact preprocessing pipeline from dataset caching (RGB conversion, direct 224x224 Bilinear resizing without center-cropping, ToTensor, and ImageNet standardization). It loads `models/mobilenetv2_final.pt`, reads the optimized confidence threshold from `models/threshold.json` (0.80), marks predictions below the threshold as UNCERTAIN, and returns full class probability distributions, confidence scores, and top-3 rankings. It also ensures `models/classes.json` is exported.
 
 ### Why it exists
 Serves as the core inference engine bridging model training to downstream consumer applications (CLI utilities, API endpoints, and web demo interfaces). It guarantees preprocessing consistency, preventing silent train-serve skew.
@@ -357,7 +357,7 @@ Serves as the core inference engine bridging model training to downstream consum
 Benchmarks model inference latency on both CPU and GPU hardware across 10 warmup and 100 timed iterations. It measures median and 95th percentile (p95) latency for both model-only forward passes and end-to-end processing (image opening, resizing, normalization, and forward pass). It computes model file size (8.75 MB) and parameter count (2,231,558), logging complete benchmark telemetry to `reports/latency.json`.
 
 ### Why it exists
-Validates edge deployment feasibility. In practical industrial waste sorting applications, conveyor belts move items past cameras at speeds requiring low latency (e.g. <50ms per item). This script proves that MobileNetV2 satisfies real-time sorting constraints on both GPU (~12ms e2e) and commodity CPU (~24ms e2e).
+Validates edge deployment feasibility. In practical automated waste sorting applications, items move past cameras at speeds requiring low latency (e.g. <50ms per item). This script proves that MobileNetV2 satisfies low-latency sorting constraints on both GPU (~12ms e2e) and commodity CPU (~24ms e2e).
 
 ### Interview Questions & Answers
 1. **Q: Why is `torch.cuda.synchronize()` strictly necessary when measuring GPU latency?**
@@ -401,7 +401,7 @@ Hugging Face Spaces containers often run in isolated Linux CPU environments with
 2. **Q: Why enforce `map_location="cpu"` and strictly CPU tensors?**
    - **A:** Free Hugging Face Spaces provide 2 vCPU hardware tiers without dedicated GPUs. Attempting to deserialize CUDA tensors or call `.cuda()` without an active GPU causes fatal PyTorch runtime exceptions.
 3. **Q: How does the standalone architecture definition prevent version incompatibility?**
-   - **A:** `space/app.py` directly defines `build_model` by wrapping `torchvision.models.mobilenet_v2(weights=None)` and swapping the classifier head. Because it loads a plain `state_dict` rather than a pickled model object, it avoids class serialization path mismatches between development environments and production containers.
+   - **A:** `space/app.py` directly defines `build_model` by wrapping `torchvision.models.mobilenet_v2(weights=None)` and swapping the classifier head. Because it loads a plain `state_dict` rather than a pickled model object, it avoids class serialization path mismatches between development environments and deployment containers.
 
 ---
 
@@ -470,8 +470,8 @@ Fulfills Phase 10 top-level documentation deliverables. It adheres strictly to t
 ### Interview Questions & Answers
 1. **Q: Why include both point estimates and 95% bootstrap confidence intervals in the main README benchmark table?**
    - **A:** Point estimates (like 89.71% test accuracy) hide finite-sample variance on a 379-image test split. Reporting 95% bootstrap confidence intervals ([86.54%, 92.61%] for accuracy; [0.8195, 0.9036] for macro-F1) provides rigorous scientific transparency regarding the true underlying generalization bounds.
-2. **Q: Why are placeholders like `DEMO_LINK_HERE` and `REPO_LINK_HERE` used in the README badges?**
-   - **A:** They establish standardized integration hooks for public deployment URLs (Hugging Face Spaces and GitHub remote repositories) without hardcoding private staging endpoints.
+2. **Q: How are public links configured in the README badges?**
+   - **A:** They link directly to the public GitHub repository and the live Streamlit demo URL (`https://ecovision-evzcs2cqdcwsrhk3fvdbxu.streamlit.app`), providing one-click access for reviewers and recruitment evaluators.
 3. **Q: Why does the README openly report that the test set rejected more images than the validation set under threshold 0.80?**
    - **A:** Scientific integrity requires communicating empirical findings honestly. Test data contains natural visual diversity and edge cases not present during validation, causing 13.19% of test samples (50 images) to fall below the cutoff compared to 7.12% on validation (27 images), while maintaining high precision (95.14% accuracy on answered items).
 
@@ -480,7 +480,7 @@ Fulfills Phase 10 top-level documentation deliverables. It adheres strictly to t
 ## 27. `REPORT.md`
 
 ### What it does
-Provides a formal, comprehensive 2-page technical evaluation and audit report summarizing the empirical findings of the EcoVision project. It details dataset provenance and cleaning, class distribution, baseline vs. transfer learning progression, the 3-seed augmentation comparison, holdout test metrics with bootstrap confidence intervals, selective classification coverage vs. accuracy trade-offs, visual error analysis, hardware latency benchmarks, real-world campus waste limitations, and strategic recommendations for production deployment.
+Provides a formal, comprehensive 2-page technical evaluation and audit report summarizing the empirical findings of the EcoVision project. It details dataset provenance and cleaning, class distribution, baseline vs. transfer learning progression, the 3-seed augmentation comparison, holdout test metrics with bootstrap confidence intervals, selective classification coverage vs. accuracy trade-offs, visual error analysis, hardware latency benchmarks, real-world campus waste limitations, and strategic recommendations for real-world deployment.
 
 ### Why it exists
 Equips engineering leads, auditors, and recruitment evaluators with a thorough, publication-grade technical report that documents the scientific rigor, statistical significance, and engineering trade-offs behind every decision in the project.
@@ -490,7 +490,7 @@ Equips engineering leads, auditors, and recruitment evaluators with a thorough, 
    - **A:** While `README.md` is an actionable developer onboarding guide (with setup commands, CLI snippets, and architecture overviews), `REPORT.md` is a formal technical whitepaper focusing on experimental methodology, statistical significance, error taxonomy, and operational risk analysis.
 2. **Q: How does `REPORT.md` justify the selection of MobileNetV2 over the scratch baseline?**
    - **A:** It presents side-by-side empirical metrics showing a massive +21.90% accuracy gain (89.71% vs. 67.81%) and +0.2170 macro-F1 gain (0.8647 vs. 0.6477), demonstrating that ImageNet pre-trained feature hierarchies are essential for generalizing from a small 1,763-image training split.
-3. **Q: What production recommendation does the report provide regarding minority class performance?**
+3. **Q: What deployment recommendation does the report provide regarding minority class performance?**
    - **A:** The report recommends targeting active data collection specifically for miscellaneous `trash` (which only had 21 test samples and an F1 of 0.6316) and expanding beyond single-item classification toward object detection for multi-item waste streams.
 
 ---

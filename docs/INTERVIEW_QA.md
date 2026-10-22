@@ -47,8 +47,8 @@ This document provides 30 straightforward, clear technical interview questions a
 ---
 
 ### 8. Data Leakage & Near-Duplicate Grouping
-**Q: What is data leakage, and how did EcoVision prevent near-duplicate leakage?**  
-**A:** Data leakage occurs when test information is inadvertently present in the training pipeline. In TrashNet, objects were photographed in bursts from slightly different angles. A naive random split would place two nearly identical photos of the same soda can into both train and test splits, allowing the model to memorize the object. We computed perceptual hashes (`pHash`) and grouped images within Hamming distance $\le 4$ into clusters, ensuring all near-duplicates landed in the same split.
+**Q: What is data leakage, and how did EcoVision address near-duplicate leakage?**  
+**A:** Data leakage occurs when test information is inadvertently present in the training pipeline. In TrashNet, objects were photographed in bursts from slightly different angles. A naive random split would place two nearly identical photos of the same soda can into both train and test splits, allowing the model to memorize the object. We computed perceptual hashes (`pHash`) and grouped images within Hamming distance $\le 4$ into clusters, placing entire clusters into single splits. While near-duplicate leakage cannot be fully excluded, this grouping substantially reduces contamination across splits.
 
 ---
 
@@ -90,7 +90,7 @@ This document provides 30 straightforward, clear technical interview questions a
 
 ### 15. Confusion Matrix Diagnosis
 **Q: What does the confusion matrix reveal about EcoVision's primary error modes?**  
-**A:** The confusion matrix shows that the primary confusion occurs between **glass and plastic** (10 glass items predicted as plastic; 5 plastic items predicted as glass). Both materials frequently appear as clear, cylindrical containers on plain backgrounds, sharing near-identical low-level specular reflections and edge contours.
+**A:** The confusion matrix shows that the primary confusion occurs between **glass and plastic**: 6 glass items were predicted as plastic (with 4 more predicted as metal), and 4 plastic items were predicted as glass (with 2 to metal, 2 to paper, and 2 to trash). Both materials frequently appear as clear, cylindrical containers on plain backgrounds, sharing similar specular reflections and contours.
 
 ---
 
@@ -102,7 +102,7 @@ This document provides 30 straightforward, clear technical interview questions a
 
 ### 17. The 3-Seed Augmentation Experiment
 **Q: Why run the augmentation comparison across 3 random seeds (42, 43, 44)?**  
-**A:** Deep learning training involves stochastic elements (data shuffling, dropout masks, weight initializations). A single run might show improvement purely by random luck. By comparing across 3 seeds on the validation set, we proved that data augmentation provided a statistically significant improvement (+0.0179 macro-F1: 0.9179 ± 0.0037 vs. 0.9001 ± 0.0064) where every augmented seed strictly outperformed every unaugmented seed.
+**A:** Deep learning training involves stochastic elements (data shuffling, dropout masks, weight initializations). A single run might show improvement purely by random luck. By comparing across 3 seeds on the validation set, we verified that the performance gain was consistent across 3 seeds (+0.0179 macro-F1: 0.9179 ± 0.0037 vs. 0.9001 ± 0.0064) where every augmented seed strictly outperformed every unaugmented seed, though 3 seeds remains a small sample.
 
 ---
 
@@ -114,7 +114,7 @@ This document provides 30 straightforward, clear technical interview questions a
 
 ### 19. Selective Classification & The Reject Option
 **Q: What is selective classification, and why is it valuable in waste sorting?**  
-**A:** In industrial recycling, misclassifying a non-recyclable item into a paper bale can ruin an entire batch. Selective classification allows the model to output "Uncertain" and reject an item when confidence is low, routing it to a human sorter. Automated sorting is reserved only for high-confidence predictions.
+**A:** In automated waste sorting, misclassifying a non-recyclable item into a paper bale can ruin an entire batch. Selective classification allows the model to output "Uncertain" and reject an item when confidence is low, routing it to a human sorter. Automated sorting is reserved only for high-confidence predictions.
 
 ---
 
@@ -126,7 +126,7 @@ This document provides 30 straightforward, clear technical interview questions a
 
 ### 21. Threshold Generalization: Validation vs. Test
 **Q: Why did the 0.80 threshold reject more test images than validation images?**  
-**A:** On validation, threshold 0.80 rejected 7.12% of items (27 / 379) with 95.17% accuracy. On holdout test data, it rejected 13.19% of items (50 / 379) with 95.14% accuracy. Test samples contain novel visual variance unseen during training, causing slightly lower softmax confidence. Despite the higher rejection rate, accuracy on accepted items remained rock-solid (95.14% vs. 95.17%), eliminating 25 out of 39 test errors.
+**A:** On validation, threshold 0.80 rejected 7.12% of items (27 / 379) with 95.17% accuracy. On holdout test data, it rejected 13.19% of items (50 / 379) with 95.14% accuracy. Test samples contain novel visual variance unseen during training, causing slightly lower softmax confidence. Despite the higher rejection rate, accuracy on accepted items remained consistent (95.14% vs. 95.17%), removing 23 of 39 test errors (while rejecting 27 correct images).
 
 ---
 
@@ -144,7 +144,7 @@ This document provides 30 straightforward, clear technical interview questions a
 
 ### 24. Measuring Edge Latency
 **Q: Why benchmark both model-only forward passes and end-to-end latency?**  
-**A:** Model-only latency measures GPU/CPU arithmetic speed, but real production pipelines must decode JPEG files from disk, resize pixels, and apply normalization. On an RTX 3050 GPU, model-only latency is 9.22 ms while end-to-end latency is 11.94 ms. On CPU, model-only is 22.95 ms and end-to-end is 24.38 ms.
+**A:** Model-only latency measures GPU/CPU arithmetic speed, but real-world deployment pipelines must decode JPEG files from disk, resize pixels, and apply normalization. On an RTX 3050 GPU, model-only latency is 9.22 ms while end-to-end latency is 11.94 ms. On CPU, model-only is 22.95 ms and end-to-end is 24.38 ms.
 
 ---
 
@@ -162,13 +162,13 @@ This document provides 30 straightforward, clear technical interview questions a
 
 ### 27. What Is an API and How Is Inference Exposed?
 **Q: How does EcoVision expose model predictions for external software systems?**  
-**A:** An Application Programming Interface (API) allows external programs to interact with our model without knowing its internal implementation. EcoVision exposes `predict_image(image_input)` returning a structured dictionary with keys: `predicted_class`, `confidence`, `uncertain`, `threshold`, and `probabilities`. This clean contract allows CLI scripts, backend web servers, or robotic sorting arms to consume predictions identically.
+**A:** An Application Programming Interface (API) allows external programs to interact with our model without knowing its internal implementation. EcoVision exposes `predict_image(image_input)` returning a structured dictionary with keys: `predicted_class`, `confidence`, `uncertain`, `threshold`, and `probabilities`. This clean contract allows CLI scripts, backend web servers, or sorting logic to consume predictions identically.
 
 ---
 
-### 28. Gradio and Hugging Face Spaces Deployment
-**Q: How is the interactive demo structured, and why is `space/` completely isolated?**  
-**A:** `app.py` launches a local Gradio interface with probability distribution bars (`gr.Label`), decision status lines, and 6 pre-loaded test examples. For cloud deployment, `space/` is an isolated, self-contained directory (8.93 MB) with its own `app.py`, `model.pt`, and `requirements.txt`. It imports zero code from `src/` and forces `map_location="cpu"`, ensuring it runs reliably on free 2-vCPU cloud hardware.
+### 28. Interactive Demo & Cloud Deployment (Streamlit & Gradio)
+**Q: How is the interactive demo structured, and how is it deployed?**  
+**A:** The project supports both local and cloud interfaces. `app.py` launches a local Gradio interface with probability distribution bars (`gr.Label`), decision status lines, and 6 pre-loaded test examples. For cloud deployment, a self-contained Streamlit application is hosted publicly at `https://ecovision-evzcs2cqdcwsrhk3fvdbxu.streamlit.app` via `space/streamlit_app.py`. A Hugging Face Space was not used because Gradio Spaces require a paid plan, whereas Streamlit Community Cloud hosts the application for free. The `space/` directory remains completely isolated (8.93 MB) with its own `model.pt` and `requirements.txt`, importing zero code from `src/` and forcing `map_location="cpu"`.
 
 ---
 

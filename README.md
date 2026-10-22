@@ -17,6 +17,20 @@ All figures below come from saved evaluation reports (`reports/baseline_vs_trans
 | **MobileNetV2 Transfer (Phase 4)** | 90.50% | 0.8988 | *Not evaluated on test* | *Not evaluated on test* |
 | **MobileNetV2 Final (Seed 44)** | **91.82%** | **0.9221** | **89.71% [86.54%, 92.61%]** | **0.8647 [0.8195, 0.9036]** |
 
+### Per-Class Results (Test)
+
+Per-class metrics for **MobileNetV2 Final** on the 379 holdout test images, extracted from `reports/test_metrics.json`:
+
+| Class | Precision | Recall | F1-Score | Support |
+| :--- | :---: | :---: | :---: | :---: |
+| **Cardboard** | 0.9661 | 0.9500 | 0.9580 | 60 |
+| **Glass** | 0.9028 | 0.8667 | 0.8844 | 75 |
+| **Metal** | 0.8571 | 0.9677 | 0.9091 | 62 |
+| **Paper** | 0.9438 | 0.9438 | 0.9438 | 89 |
+| **Plastic** | 0.8611 | 0.8611 | 0.8611 | 72 |
+| **Trash** | 0.7059 | 0.5714 | 0.6316 | 21 |
+| **Macro Average** | **0.8728** | **0.8601** | **0.8647** | **379** |
+
 ---
 
 ## Dataset & Provenance
@@ -71,12 +85,20 @@ The threshold was chosen **using validation predictions only** (`reports/thresho
 
 ## Error Analysis & Failure Cases
 
+![Test Set Confusion Matrix](reports/test_confusion_matrix.png)
+
 ![Test Set Failure Cases](reports/failure_cases.png)
 
-Out of 379 test images, 39 were misclassified (89.71% accuracy); all errors are listed in `reports/test_errors.csv`. The main failure patterns are below. The reasons given are **hypotheses and were not tested**:
-1. **Glass vs. plastic:** Transparent plastic bottles and glass jars can look similar (reflections, shape) against a white background.
-2. **Trash class:** Trash has the lowest F1 of all classes (0.6316). It has only 137 images (21 in the test set), so its metrics are uncertain, and the class contains very varied items.
-3. **Cardboard vs. paper:** Brown paper and flattened cardboard can look alike under soft lighting.
+Out of 379 test images, 39 were misclassified (89.71% overall accuracy); all errors are listed in `reports/test_errors.csv`. Analysis of the test predictions reveals the top true $\rightarrow$ predicted confusion pairs observed:
+
+1. **Glass $\rightarrow$ Plastic (6 misclassifications):** Clear glass bottles and jars predicted as plastic. *Untested hypothesis:* Transparent plastics and clear soda-lime glass share similar silhouettes and specular highlights against white backgrounds.
+2. **Glass $\rightarrow$ Metal (4 misclassifications):** Glass items predicted as metal. *Untested hypothesis:* Dark tinted glass and jars with metallic lids produce strong specular glints or dark textures resembling metal cans.
+3. **Plastic $\rightarrow$ Glass (4 misclassifications):** Clear plastic containers predicted as glass. *Untested hypothesis:* Rigid transparent PET containers exhibit visual reflections similar to glass bottles under studio lighting.
+4. **Paper $\rightarrow$ Plastic (3 misclassifications):** Paper items predicted as plastic. *Untested hypothesis:* Coated, glossy magazines or laminated paper food packaging have reflective sheens resembling smooth plastic wrap.
+5. **Trash $\rightarrow$ Metal (3 misclassifications):** Miscellaneous trash items predicted as metal. *Untested hypothesis:* Trash items containing metallic foil elements, batteries, or crumpled snack wrappers trigger metal texture features.
+6. **Trash $\rightarrow$ Paper (3 misclassifications):** Miscellaneous trash items predicted as paper. *Untested hypothesis:* Composite waste containing discarded paper napkins, receipts, or cardboard fragments trigger paper patterns.
+
+*(Note: Additional confusions observed at lower frequencies include metal $\rightarrow$ glass [2], paper $\rightarrow$ trash [2], plastic $\rightarrow$ paper [2], plastic $\rightarrow$ metal [2], and plastic $\rightarrow$ trash [2]. Trash had 9 false negatives in total out of 21 test samples, leading to its lower F1 of 0.6316.)*
 
 ---
 
@@ -174,8 +196,12 @@ print("Probabilities   :", result["probabilities"])
 ```bash
 # Local Gradio interface (http://127.0.0.1:7860)
 python app.py
+
+# Local Streamlit interface
+streamlit run space/streamlit_app.py
 ```
-Web demo (Streamlit): `streamlit run space/streamlit_app.py`
+- **Live Cloud Demo:** [https://ecovision-evzcs2cqdcwsrhk3fvdbxu.streamlit.app](https://ecovision-evzcs2cqdcwsrhk3fvdbxu.streamlit.app)  
+  *(Note: The live demo is hosted on Streamlit Community Cloud. A Hugging Face Space was not used because persistent Gradio Spaces require a paid plan, whereas Streamlit Community Cloud provides free public hosting for the standalone app).*
 
 
 ---

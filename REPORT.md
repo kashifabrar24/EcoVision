@@ -8,13 +8,13 @@
 
 ## 1. Executive Summary
 
-This report presents the rigorous engineering evaluation of **EcoVision**, an automated waste material classification system built on the TrashNet dataset. By pairing a transfer-learned MobileNetV2 architecture with leak-free stratified group splitting, class-balanced loss weighting, data augmentation, and empirical confidence thresholding, EcoVision achieves **89.71% accuracy** (95% bootstrap CI: [86.54%, 92.61%]) and **0.8647 macro-F1** (95% bootstrap CI: [0.8195, 0.9036]) on holdout test data. This represents a definitive **+21.90% accuracy** and **+0.2170 macro-F1** improvement over an architectural baseline CNN trained from scratch.
+This report presents the rigorous engineering evaluation of **EcoVision**, an automated waste material classification system built on the TrashNet dataset. By pairing a transfer-learned MobileNetV2 architecture with stratified group splitting, class-balanced loss weighting, data augmentation, and empirical confidence thresholding, EcoVision achieves **89.71% accuracy** (95% bootstrap CI: [86.54%, 92.61%]) and **0.8647 macro-F1** (95% bootstrap CI: [0.8195, 0.9036]) on holdout test data. This represents a definitive **+21.90% accuracy** and **+0.2170 macro-F1** improvement over an architectural baseline CNN trained from scratch.
 
-Furthermore, by applying an operational confidence threshold of **0.80** (optimized strictly on validation predictions), the system enables selective classification: automated sorting is executed for **86.81%** of incoming items at **95.14% accuracy**, while diverting the remaining 13.19% of ambiguous items to secondary inspection. Edge inference latency averages **11.94 ms** on GPU and **24.38 ms** on commodity CPU, proving feasibility for high-speed industrial conveyor deployment.
+Furthermore, by applying an operational confidence threshold of **0.80** (optimized strictly on validation predictions), the system enables selective classification: automated sorting is executed for **86.81%** of incoming items at **95.14% accuracy**, while diverting the remaining 13.19% of ambiguous items to secondary inspection. Edge inference latency averages **11.94 ms** on GPU and **24.38 ms** on commodity CPU, confirming low latency for automated sorting pipelines.
 
 ---
 
-## 2. Dataset Provenance, Integrity Audit & Leak-Proof Splitting
+## 2. Dataset Provenance, Integrity Audit & Group Splitting
 
 ### 2.1 Resolving the 2x Hugging Face Mirror Duplication
 The Hugging Face mirror (`garythung/trashnet`) contains 5,054 rows rather than the 2,527 images in the original GitHub repository. Empirical inspection of pixel dimensions and MD5 hashes revealed that the mirror's auto-generated dataset loader ingested two zip archives (`dataset-original.zip` and `dataset-resized.zip`) into a single `train` split, duplicating every image at two resolutions.
@@ -28,7 +28,7 @@ Cryptographic and perceptual hashing (`pHash`) uncovered 3 identical image pairs
 All 6 instances were permanently purged to ensure zero label noise, yielding a clean dataset of **2,521 unique images**.
 
 ### 2.3 Stratified Group Splitting
-To prevent near-duplicate leakage (e.g. consecutive shots of the same bottle taken seconds apart landing in both train and test), connected components on pHash Hamming distance $\le 4$ were grouped together. Using seed 42, a leak-free Stratified Group Split partitioned the clean dataset:
+To reduce near-duplicate leakage (e.g. consecutive shots of the same bottle taken seconds apart landing in both train and test), connected components on pHash Hamming distance $\le 4$ were grouped together. While near-duplicate variance across splits cannot be fully excluded, this Stratified Group Split (seed 42) partitions the clean dataset:
 - **Train Set (70.0%):** 1,763 images
 - **Validation Set (15.0%):** 379 images
 - **Holdout Test Set (15.0%):** 379 images (sealed until final Phase 6 benchmarking)
@@ -88,11 +88,11 @@ All test evaluations were executed in a single unbiased pass on the 379 holdout 
 ---
 
 ## 5. Selective Classification & Confidence Thresholding
-
-To avoid erroneous classification in industrial waste streams, a confidence rejection mechanism was tuned on validation predictions (`reports/threshold_sweep.csv`). The pre-committed optimization criterion required the highest coverage with validation accuracy $\ge$ 95%. This yielded an operating cutoff of **0.80**.
-
+ 
+To avoid erroneous classification in automated waste sorting streams, a confidence rejection mechanism was tuned on validation predictions (`reports/threshold_sweep.csv`). The pre-committed optimization criterion required the highest coverage with validation accuracy $\ge$ 95%. This yielded an operating cutoff of **0.80**.
+ 
 ### 5.1 Validation vs. Test Threshold Impact
-
+ 
 | Metric | Validation Split (Tuned) | Test Split (Deployed) |
 | :--- | :---: | :---: |
 | **Operating Threshold** | 0.80 | 0.80 |
@@ -100,45 +100,45 @@ To avoid erroneous classification in industrial waste streams, a confidence reje
 | **Rejection Rate** | 7.12% (27 rejected) | **13.19%** (50 rejected) |
 | **Accuracy on Answered** | 95.17% | **95.14%** |
 | **Macro-F1 on Answered** | 0.9531 | **0.9231** |
-
-**Empirical Observation:** The holdout test set experienced a higher rejection rate (13.19% vs. 7.12%) than the validation set. This behavior is expected because novel holdout instances contain un-modeled feature variances that lower posterior softmax probabilities. However, on answered samples, test accuracy generalized almost identically (**95.14%** vs. 95.17%), eliminating 25 out of the 39 raw test misclassifications.
-
+ 
+**Empirical Observation:** The holdout test set experienced a higher rejection rate (13.19% vs. 7.12%) than the validation set. This behavior is expected because novel holdout instances contain un-modeled feature variances that lower posterior softmax probabilities. However, on answered samples, test accuracy generalized almost identically (**95.14%** vs. 95.17%), removing 23 of the 39 raw test misclassifications (while rejecting 27 correct predictions).
+ 
 ---
-
+ 
 ## 6. Failure Modes & Error Analysis
-
+ 
 ![Test Failure Cases](reports/failure_cases.png)
-
-Detailed analysis of the 39 test errors (`reports/test_errors.csv`) highlights two dominant visual confusions:
-1. **Material Transparency & Specular Highlight Overlap (Glass vs. Plastic):** 10 glass samples were misclassified as plastic, and 5 plastic samples were misclassified as glass. Cylindrical transparent containers under studio spotlighting produce identical specular edge glints that cannot be resolved without material-specific spectral or tactile sensors.
+ 
+Detailed analysis of the 39 test errors (`reports/test_errors.csv`) highlights the observed visual confusions:
+1. **Material Transparency & Specular Highlight Overlap (Glass vs. Plastic):** 6 glass samples were misclassified as plastic (and 4 as metal), while 4 plastic samples were misclassified as glass (with 2 to metal, 2 to paper, and 2 to trash). Cylindrical transparent containers under studio spotlighting produce similar specular edge glints that cannot be easily resolved without material-specific spectral or tactile sensors (untested hypothesis).
 2. **Minority Class Support Volatility (Trash):** With only 21 holdout test examples, the `trash` class suffered 9 false negatives, pulling its class F1 down to 0.6316. Items classified as trash exhibit extreme intra-class heterogeneity (e.g., styrofoam, broken pens, candy wrappers) that require substantially larger training support.
-
+ 
 ---
-
+ 
 ## 7. Edge Deployment Latency
-
+ 
 Benchmarked using `src/measure_latency.py` across 10 warmup and 100 timed iterations. Model checkpoint size is **8.75 MB**.
-
+ 
 | Hardware Platform | Execution Mode | Median Latency | p95 Tail Latency | Mean ± Std |
 | :--- | :--- | :---: | :---: | :---: |
 | **NVIDIA RTX 3050 Laptop GPU** | Model-Only Forward Pass | 9.22 ms | 12.38 ms | 9.69 ± 1.43 ms |
 | | End-to-End (I/O + Preprocess + Model) | **11.94 ms** | **13.88 ms** | 12.11 ± 0.84 ms |
 | **AMD64 Commodity CPU** | Model-Only Forward Pass | 22.95 ms | 31.95 ms | 23.97 ± 3.70 ms |
 | | End-to-End (I/O + Preprocess + Model) | **24.38 ms** | **29.38 ms** | 26.15 ± 11.53 ms |
-
-Both hardware configurations easily fulfill the real-time requirements of industrial sorting conveyors (<50 ms per item).
-
+ 
+Both hardware configurations easily fulfill low-latency requirements for automated sorting (<50 ms per item).
+ 
 ---
-
-## 8. Honest Limitations & Production Considerations
-
+ 
+## 8. Honest Limitations & Real-World Deployment Considerations
+ 
 1. **Inference Resolution Pre-caching Delta:** Feeding uncompressed 512×384 raw images directly into inference code can produce slight probability variations compared to pre-cached 224×224 JPEG images (maximum observed difference was 0.065 on one `trash` image, with predicted class remaining unchanged). The working hypothesis is that saving the cache at JPEG quality 95 introduced high-frequency DCT quantization artifacts that slightly perturb activations.
 2. **Controlled Studio Collection Bias:** TrashNet images consist of clean, centered single items photographed on pristine white posterboard. Real-world municipal recycling facilities encounter crushed, soiled, occluded, and multi-object waste streams.
 3. **Winner's Curse / Validation Optimism:** Test macro-F1 (0.8647) is lower than validation macro-F1 (0.9221) because model architecture, checkpoint selection, and confidence thresholds were optimized against the validation distribution.
 4. **Softmax Overconfidence:** Standard softmax can assign high confidence scores to out-of-distribution inputs (e.g. biological waste or electronic devices).
-
+ 
 ---
-
+ 
 ## 9. Conclusion
-
-EcoVision establishes a scientifically sound, leak-free, and auditable benchmark for waste material classification. By combining MobileNetV2 transfer learning with selective classification rejection, the system achieves **95.14% operational accuracy** while maintaining sub-25 ms edge latency. Future deployment cycles must prioritize in-situ cluttered data collection and multi-label object detection.
+ 
+EcoVision establishes a scientifically sound, group-stratified, and auditable benchmark for waste material classification. By combining MobileNetV2 transfer learning with selective classification rejection, the system achieves **95.14% operational accuracy** on answered items while maintaining sub-25 ms edge latency. Future development cycles must prioritize in-situ cluttered data collection and multi-label object detection.
