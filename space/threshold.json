@@ -1,0 +1,13 @@
+{
+  "chosen_threshold": 0.8,
+  "selection_rule": "Highest coverage with validation accuracy >= 0.95",
+  "validation": {
+    "threshold": 0.8,
+    "coverage": 0.9288,
+    "accuracy": 0.9517,
+    "macro_f1": 0.9531,
+    "num_answered": 352,
+    "num_rejected": 27,
+    "total_samples": 379
+  }
+}

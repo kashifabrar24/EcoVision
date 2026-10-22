@@ -367,4 +367,77 @@ Validates edge deployment feasibility. In practical industrial waste sorting app
 3. **Q: Why use median and p95 rather than only mean latency?**
    - **A:** Mean latency is sensitive to transient system spikes (OS context switches, garbage collection pauses, thermal throttling). The median represents typical throughput, while p95 captures tail latency, which dictates service-level agreements (SLAs) in real-time embedded systems.
 
+---
+
+## 21. `app.py`
+
+### What it does
+Launches the local Gradio web application for EcoVision. Accepts image uploads (`type="pil"`), feeds them through `predict_image`, and displays a `gr.Label` component with all 6 class probabilities alongside a status text line indicating whether the sample is accepted (`"Predicted: <class> (confidence XX.X%)"`) or rejected as uncertain (`"Uncertain: confidence below threshold, closest class: <class>"`). Registers 6 test split examples under `demo_examples/` and provides honest documentation regarding studio photography domain shift.
+
+### Why it exists
+Fulfills Phase 9 interactive demo requirements, providing stakeholders, end-users, and technical interviewers with an intuitive graphical interface to test model predictions and explore threshold behavior interactively.
+
+### Interview Questions & Answers
+1. **Q: Why use Gradio's `gr.Label` with top-6 classes rather than simply showing the top-1 prediction text?**
+   - **A:** `gr.Label` visualizes the entire softmax posterior probability distribution across all 6 classes. This gives transparency into model certainty and reveals secondary candidate classes (e.g., when the model is torn between glass and plastic), aiding user trust and diagnostic error analysis.
+2. **Q: Why include pre-loaded test examples in the UI?**
+   - **A:** Providing curated test set samples ensures immediate zero-friction evaluation for reviewers without requiring them to search for, download, or transfer test images to the machine.
+3. **Q: Why explicitly include the disclaimer that real campus waste may be harder?**
+   - **A:** Scientific integrity requires communicating model limitations. TrashNet contains clean single-item studio photos on plain posterboard. Real-world waste items exhibit heavy deformation, staining, occlusions, and varied backgrounds, so transparently stating domain shift sets appropriate operational expectations.
+
+---
+
+## 22. `space/app.py`
+
+### What it does
+Provides a completely self-contained, CPU-safe Gradio application tailored for deployment on Hugging Face Spaces. It imports zero code from `src/`, loads all assets locally (`model.pt`, `classes.json`, `threshold.json`, `demo_examples/`), executes exclusively on CPU (`map_location="cpu"`), mirrors the exact training preprocessing pipeline, and exposes the identical interactive interface.
+
+### Why it exists
+Hugging Face Spaces containers often run in isolated Linux CPU environments without access to local repository packages or GPU acceleration. Isolating the deployment package into a standalone directory ensures that the public cloud demo remains robust, zero-dependency, and immediately deployable.
+
+### Interview Questions & Answers
+1. **Q: Why must `space/app.py` not import anything from `src/`?**
+   - **A:** When deployed to Hugging Face Spaces, only the contents of the `space/` directory (or Git repository root of the Space) are deployed into the cloud container. If `app.py` attempted to import from `src.predict`, the container would immediately crash with `ModuleNotFoundError`.
+2. **Q: Why enforce `map_location="cpu"` and strictly CPU tensors?**
+   - **A:** Free Hugging Face Spaces provide 2 vCPU hardware tiers without dedicated GPUs. Attempting to deserialize CUDA tensors or call `.cuda()` without an active GPU causes fatal PyTorch runtime exceptions.
+3. **Q: How does the standalone architecture definition prevent version incompatibility?**
+   - **A:** `space/app.py` directly defines `build_model` by wrapping `torchvision.models.mobilenet_v2(weights=None)` and swapping the classifier head. Because it loads a plain `state_dict` rather than a pickled model object, it avoids class serialization path mismatches between development environments and production containers.
+
+---
+
+## 23. `space/requirements.txt`
+
+### What it does
+Specifies the exact minimal CPU-only wheel dependencies for the Hugging Face Space. Its first line instructs pip to use PyTorch's official CPU wheel index (`--extra-index-url https://download.pytorch.org/whl/cpu`), followed by pinned versions `torch==2.6.0`, `torchvision==0.21.0`, `pillow`, and `numpy`.
+
+### Why it exists
+Standard PyPI wheels for PyTorch include bundled NVIDIA CUDA runtime libraries that bloat the container installation by 2–3 GB, causing slow builds and exceeding disk limits. The CPU index installs lightweight wheels (~150 MB) while deliberately excluding `gradio` (which Hugging Face Spaces injects and manages automatically).
+
+### Interview Questions & Answers
+1. **Q: Why should `gradio` be omitted from `space/requirements.txt`?**
+   - **A:** Hugging Face Spaces automatically reads the Gradio version from the `README.md` YAML metadata block (`sdk_version: 6.30.0`) and pre-installs it in the base image. Declaring `gradio` in `requirements.txt` can cause conflicting dependency resolutions or redundant installation overhead.
+2. **Q: What is the benefit of pointing `--extra-index-url` to PyTorch's CPU wheel repository?**
+   - **A:** It downloads lean CPU-only binaries rather than bloated CUDA-enabled wheels, speeding up Hugging Face container build times from several minutes to seconds and conserving container ephemeral storage.
+3. **Q: Why pin `torch==2.6.0` and `torchvision==0.21.0`?**
+   - **A:** Pinning the exact minor versions prevents breaking changes in torch/torchvision APIs, ensuring that model weight deserialization and torchvision model architecture builders remain 100% deterministic.
+
+---
+
+## 24. `space/README.md`
+
+### What it does
+Serves as the configuration manifest and documentation landing page for the Hugging Face Space. It defines YAML front matter (`title: EcoVision`, `emoji: ♻️`, `colorFrom: green`, `colorTo: blue`, `sdk: gradio`, `sdk_version: 6.30.0`, `app_file: app.py`, `pinned: false`) followed by a concise 5-line project overview and honest capability description.
+
+### Why it exists
+Hugging Face Spaces parser relies on the YAML header at the top of `README.md` to configure the Space runtime environment (selecting the Gradio SDK version, launch file, and visual card styling).
+
+### Interview Questions & Answers
+1. **Q: How does Hugging Face Spaces use the YAML front matter in `README.md`?**
+   - **A:** Hugging Face's container builder parses the YAML front matter before building the image. It uses `sdk: gradio` and `sdk_version` to bootstrap the container with the correct web framework runtime and executes `app_file` upon container start.
+2. **Q: Why is pinning `sdk_version` critical in Spaces configuration?**
+   - **A:** If `sdk_version` is omitted or unpinned, Hugging Face defaults to the latest Gradio release, which may introduce breaking API changes (such as changes to `gr.Interface`, components, or flagging options), causing the deployment to crash unexpectedly.
+3. **Q: What is the role of the 5-line text description below the YAML block?**
+   - **A:** It provides immediate context to visitors, explaining the model architecture, supported waste categories, selective thresholding behavior, and transparent disclosures about domain shift from studio photos.
+
+
 
