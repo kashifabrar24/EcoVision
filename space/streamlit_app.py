@@ -123,6 +123,10 @@ def main():
     st.set_page_config(page_title="EcoVision", page_icon="♻️", layout="centered")
 
     st.title("EcoVision")
+    st.caption(
+        "MobileNetV2, confidence threshold 0.80 (chosen on validation) • "
+        "[GitHub Repository](https://github.com/kashifabrar24/EcoVision)"
+    )
     st.write(
         "Automated recyclable waste classification into 6 categories: "
         "**cardboard, glass, metal, paper, plastic, and trash**."
@@ -180,6 +184,10 @@ def main():
     if st.session_state.selected_image is not None:
         st.write("---")
         img = st.session_state.selected_image
+        res = predict_image(img, model)
+        pred_class = res["predicted_class"]
+        conf = res["confidence"]
+        is_uncertain = res["uncertain"]
 
         col_img, col_pred = st.columns([1, 1])
 
@@ -187,11 +195,6 @@ def main():
             st.image(img, caption=st.session_state.source_name, use_container_width=True)
 
         with col_pred:
-            res = predict_image(img, model)
-            pred_class = res["predicted_class"]
-            conf = res["confidence"]
-            is_uncertain = res["uncertain"]
-
             if is_uncertain:
                 st.warning(
                     f"Uncertain: confidence below threshold, closest class: {pred_class}"
@@ -201,8 +204,11 @@ def main():
                     f"Predicted: {pred_class} (confidence {conf * 100:.1f}%)"
                 )
 
-            st.write(f"**Confidence Score:** {conf * 100:.2f}%")
-            st.write(f"**Operating Threshold:** {DECISION_THRESHOLD * 100:.1f}%")
+            # Top-3 classes with percentages
+            sorted_probs = sorted(res["probabilities"].items(), key=lambda x: x[1], reverse=True)
+            st.write("**Top-3 Classes:**")
+            for rank, (cls_name, prob_val) in enumerate(sorted_probs[:3], 1):
+                st.write(f"{rank}. **{cls_name}**: {prob_val * 100:.1f}%")
 
         # Bar chart of all 6 class probabilities
         st.write("### Class Probabilities")
