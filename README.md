@@ -2,8 +2,8 @@
 
 EcoVision is an end-to-end computer vision pipeline that classifies waste images into six categories (cardboard, glass, metal, paper, plastic, and trash). It uses a fine-tuned MobileNetV2 with a custom classification head, class weighting, and data augmentation. A confidence threshold of 0.80, chosen on the validation set, accepts a prediction only when the model is confident enough. Lower-confidence items are flagged as "uncertain" so they could be checked manually.
 
-[![Live Demo](https://img.shields.io/badge/HuggingFace-Spaces%20Demo-yellow)](DEMO_LINK_HERE)
-[![GitHub Repository](https://img.shields.io/badge/GitHub-Repository-blue)](REPO_LINK_HERE)
+[![Live Demo](https://img.shields.io/badge/Streamlit-Live%20Demo-red)](https://ecovision-evzcs2cqdcwsrhk3fvdbxu.streamlit.app)
+[![GitHub Repository](https://img.shields.io/badge/GitHub-Repository-blue)](https://github.com/kashifabrar24/EcoVision)
 
 ---
 
