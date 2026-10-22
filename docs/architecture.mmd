@@ -1,0 +1,67 @@
+graph TD
+    subgraph DataIngestion ["1. Data Acquisition & Provenance"]
+        A1["TrashNet Raw Data<br/>GitHub Commit: 6fa2b87 (2,527 images)<br/>Hugging Face Mirror (5,054 rows: original + resized)"]
+    end
+
+    subgraph AuditDedupe ["2. Audit & Deduplication (data_audit.py, dedupe_split.py)"]
+        B1["MD5 Pixel Hash + Perceptual Hash (pHash)"]
+        B2["Resolve 2x Mirror Duplication<br/>Remove 3 Contradictory Label Pairs (6 images)"]
+        B3["2,521 Clean Images<br/>Group Near-Duplicates (pHash Hamming Distance <= 4)"]
+        A1 --> B1 --> B2 --> B3
+    end
+
+    subgraph Splitting ["3. Leak-Free Partitioning (dedupe_split.py)"]
+        C1["Stratified Group Split (Seed 42)<br/>Zero-leakage between identical objects"]
+        C2["Train Split: 1,763 images (70%)"]
+        C3["Validation Split: 379 images (15%)"]
+        C4["Test Split: 379 images (15%) [Pristine Holdout]"]
+        B3 --> C1
+        C1 --> C2
+        C1 --> C3
+        C1 --> C4
+    end
+
+    subgraph Preprocessing ["4. Caching & Normalization"]
+        D1["Direct Resize to 224x224 (Bilinear, NO crop)<br/>ToTensor() + ImageNet Standardization"]
+        C2 --> D1
+        C3 --> D1
+        C4 --> D1
+    end
+
+    subgraph Modeling ["5. Model Exploration & Training"]
+        E1["Baseline CNN<br/>4 Conv Blocks + GAP<br/>Trained from scratch (390k params)"]
+        E2["MobileNetV2 Transfer Learning<br/>ImageNet Backbone + Custom Head (2.23M params)<br/>Two-Stage Fine-Tuning"]
+        E3["Stage 1: Frozen Backbone (Head only, lr=1e-3)"]
+        E4["Stage 2: Unfreeze last 3 blocks (lr=1e-4, Head lr=1e-3)"]
+        E5["Phase 5: Data Augmentation Experiment<br/>3 Random Seeds (42, 43, 44)<br/>Flips, Rotations, ColorJitter, RandomResizedCrop"]
+        D1 --> E1
+        D1 --> E2
+        E2 --> E3 --> E4 --> E5
+    end
+
+    subgraph ValidationTuning ["6. Validation Selection & Selective Classification"]
+        F1["Checkpoint Selection strictly on Val Set<br/>Augmentation Seed 44 (Val Macro-F1: 0.9221)"]
+        F2["Confidence Threshold Optimization (tune_threshold.py)<br/>Sweep 0.30 - 0.95 on val_predictions.csv<br/>Select Cutoff = 0.80 (Highest coverage with Val Acc >= 0.95)"]
+        E1 --> F1
+        E5 --> F1
+        F1 --> F2
+    end
+
+    subgraph TestEvaluation ["7. Final Holdout Evaluation (evaluate_test.py)"]
+        G1["Single Unbiased Pass on Test Split (379 images)<br/>Baseline: 67.81% Acc / 0.6477 Macro-F1<br/>MobileNetV2 Final: 89.71% Acc / 0.8647 Macro-F1"]
+        G2["Statistical Validation<br/>1,000-resample Bootstrap 95% CIs<br/>Confusion Matrix & Failure Mode Diagnosis"]
+        G3["Test with Threshold (0.80)<br/>Coverage: 86.81% (329 answered, 50 rejected)<br/>Accuracy on answered: 95.14%"]
+        C4 -. Holdout Evaluation .-> G1
+        F2 --> G1
+        G1 --> G2
+        G1 --> G3
+    end
+
+    subgraph Serving ["8. Production & Deployment"]
+        H1["Inference Module (src/predict.py)<br/>CLI + Programmatic API (predict_image)<br/>Exact Preprocessing Alignment"]
+        H2["Interactive Local Demo (app.py)<br/>Gradio Web UI + 6 Test Examples<br/>Probability Bars + Uncertainty Routing"]
+        H3["Hugging Face Space (space/app.py)<br/>Standalone, CPU-only (map_location='cpu')<br/>Lightweight wheel dependencies"]
+        G3 --> H1
+        H1 --> H2
+        H1 --> H3
+    end

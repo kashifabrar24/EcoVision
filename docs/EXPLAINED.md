@@ -439,5 +439,78 @@ Hugging Face Spaces parser relies on the YAML header at the top of `README.md` t
 3. **Q: What is the role of the 5-line text description below the YAML block?**
    - **A:** It provides immediate context to visitors, explaining the model architecture, supported waste categories, selective thresholding behavior, and transparent disclosures about domain shift from studio photos.
 
+---
+
+## 25. `docs/architecture.png` & `docs/architecture.mmd`
+
+### What it does
+Visualizes the end-to-end data processing, model training, validation selection, threshold tuning, test auditing, and edge deployment pipeline for EcoVision. `docs/architecture.mmd` provides the version-controlled Mermaid diagram source, while `docs/architecture.png` is a high-resolution (220 DPI) graphical representation generated using `matplotlib` with zero overlapping text boxes or crossing flow lines.
+
+### Why it exists
+Provides immediate architectural clarity for engineering reviews, recruitment audits, and documentation landing pages, showing how raw dataset archives are transformed into leak-proof splits and served on edge hardware.
+
+### Interview Questions & Answers
+1. **Q: Why maintain both Mermaid code (`.mmd`) and a rendered PNG (`.png`)?**
+   - **A:** Mermaid provides a text-based, version-controllable specification that can be edited and reviewed via Git diffs, while the static PNG guarantees identical, high-fidelity rendering across all markdown viewers, offline readers, and platforms that do not support dynamic Mermaid parsing.
+2. **Q: How does the diagram reflect the strict separation of validation and test stages?**
+   - **A:** The diagram visually routes model selection (Augmentation Seed 44) and confidence threshold optimization (0.80 cutoff) strictly from the validation split into the final model checkpoint, while the holdout test set is connected via a single, unidirectional arrow evaluated only once in Phase 6.
+3. **Q: Why are both model-only and end-to-end latency benchmarks illustrated on the architecture card?**
+   - **A:** It demonstrates full-system engineering awareness. Neural compute latency (9.22 ms on GPU) only reflects tensor arithmetic, whereas end-to-end latency (11.94 ms on GPU / 24.38 ms on CPU) accounts for image decoding, memory copies, and preprocessing, proving real-world edge feasibility.
+
+---
+
+## 26. `README.md`
+
+### What it does
+Serves as the primary documentation portal and entry point for the entire EcoVision repository. It provides an executive summary, benchmark results tables (including validation scores and test 95% bootstrap confidence intervals), dataset provenance and 2x mirror discrepancy explanations, class imbalance statistics, the architecture diagram, two-stage fine-tuning methodology, reproduce-from-scratch instructions, CLI and API usage examples, latency benchmarks, confidence threshold analysis, failure case visualizations, honest technical caveats, and formal dataset attribution.
+
+### Why it exists
+Fulfills Phase 10 top-level documentation deliverables. It adheres strictly to the rule that every reported number must originate from files in `reports/` or `models/`, ensuring complete auditability and credibility for technical reviewers and hiring managers.
+
+### Interview Questions & Answers
+1. **Q: Why include both point estimates and 95% bootstrap confidence intervals in the main README benchmark table?**
+   - **A:** Point estimates (like 89.71% test accuracy) hide finite-sample variance on a 379-image test split. Reporting 95% bootstrap confidence intervals ([86.54%, 92.61%] for accuracy; [0.8195, 0.9036] for macro-F1) provides rigorous scientific transparency regarding the true underlying generalization bounds.
+2. **Q: Why are placeholders like `DEMO_LINK_HERE` and `REPO_LINK_HERE` used in the README badges?**
+   - **A:** They establish standardized integration hooks for public deployment URLs (Hugging Face Spaces and GitHub remote repositories) without hardcoding private staging endpoints.
+3. **Q: Why does the README openly report that the test set rejected more images than the validation set under threshold 0.80?**
+   - **A:** Scientific integrity requires communicating empirical findings honestly. Test data contains natural visual diversity and edge cases not present during validation, causing 13.19% of test samples (50 images) to fall below the cutoff compared to 7.12% on validation (27 images), while maintaining high precision (95.14% accuracy on answered items).
+
+---
+
+## 27. `REPORT.md`
+
+### What it does
+Provides a formal, comprehensive 2-page technical evaluation and audit report summarizing the empirical findings of the EcoVision project. It details dataset provenance and cleaning, class distribution, baseline vs. transfer learning progression, the 3-seed augmentation comparison, holdout test metrics with bootstrap confidence intervals, selective classification coverage vs. accuracy trade-offs, visual error analysis, hardware latency benchmarks, real-world campus waste limitations, and strategic recommendations for production deployment.
+
+### Why it exists
+Equips engineering leads, auditors, and recruitment evaluators with a thorough, publication-grade technical report that documents the scientific rigor, statistical significance, and engineering trade-offs behind every decision in the project.
+
+### Interview Questions & Answers
+1. **Q: What is the primary purpose of `REPORT.md` relative to `README.md`?**
+   - **A:** While `README.md` is an actionable developer onboarding guide (with setup commands, CLI snippets, and architecture overviews), `REPORT.md` is a formal technical whitepaper focusing on experimental methodology, statistical significance, error taxonomy, and operational risk analysis.
+2. **Q: How does `REPORT.md` justify the selection of MobileNetV2 over the scratch baseline?**
+   - **A:** It presents side-by-side empirical metrics showing a massive +21.90% accuracy gain (89.71% vs. 67.81%) and +0.2170 macro-F1 gain (0.8647 vs. 0.6477), demonstrating that ImageNet pre-trained feature hierarchies are essential for generalizing from a small 1,763-image training split.
+3. **Q: What production recommendation does the report provide regarding minority class performance?**
+   - **A:** The report recommends targeting active data collection specifically for miscellaneous `trash` (which only had 21 test samples and an F1 of 0.6316) and expanding beyond single-item classification toward object detection for multi-item waste streams.
+
+---
+
+## 28. `docs/INTERVIEW_QA.md`
+
+### What it does
+Compiles 30 comprehensive, plain-language technical interview questions and answers grounded directly in EcoVision's empirical numbers, architecture, and code. Topics span CNN fundamentals, transfer learning, MobileNetV2 architecture, two-stage fine-tuning, train/val/test split hygiene, near-duplicate leakage prevention, class imbalance and inverse frequency weighting, macro-F1 vs. accuracy, confusion matrix interpretation, overfitting and loss gap analysis, the 3-seed augmentation experiment, early stopping, selective classification thresholding, bootstrap confidence intervals, GPU latency synchronization, train-serve skew elimination, API contracts, Git hygiene, and real-world campus waste limitations.
+
+### Why it exists
+Serves as an exhaustive technical preparation guide for code reviews and recruitment interviews, demonstrating deep theoretical mastery paired with authentic hands-on empirical experience.
+
+### Interview Questions & Answers
+1. **Q: Why are real numbers from `reports/` referenced in nearly every answer in `INTERVIEW_QA.md`?**
+   - **A:** Quoting verified empirical figures (such as "390,438 baseline parameters", "+0.0179 macro-F1 augmentation gain", "0.80 cutoff achieving 95.14% test accuracy", and "11.94 ms GPU latency") proves that the developer directly built, measured, and debugged the system rather than reciting generic textbook definitions.
+2. **Q: How does `INTERVIEW_QA.md` explain the trade-off between coverage and accuracy in selective classification?**
+   - **A:** It explains that raising the confidence threshold filters out low-confidence, error-prone predictions, increasing accuracy on accepted items but reducing the proportion of items automated. A cutoff of 0.80 achieved the Pareto-optimal operating target ($\ge 95\%$ accuracy on answered items) while automating 86.81% of test waste.
+3. **Q: How does the document address the question of real-world deployment limitations?**
+   - **A:** It honestly acknowledges domain shift: TrashNet consists of clean, single items on white posterboard, whereas real campus waste is crushed, food-soiled, multi-object, and viewed under variable lighting. Deploying to real bins requires in-situ collection and multi-label object detection.
+
+
 
 
