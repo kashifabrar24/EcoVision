@@ -1,6 +1,6 @@
-# EcoVision: Production Waste Material Classification with Selective Rejection
+# EcoVision: Waste Image Classification with a Confidence Threshold
 
-EcoVision is an end-to-end computer vision and selective classification system designed to categorize recyclable waste into six categories (cardboard, glass, metal, paper, plastic, and trash). Powered by a fine-tuned MobileNetV2 architecture with custom classification head, balanced class weighting, and data augmentation, the pipeline integrates an empirical confidence thresholding mechanism that accepts automated classifications only when confidence meets or exceeds 0.80, safely routing ambiguous or low-confidence waste items to manual or secondary inspection.
+EcoVision is an end-to-end computer vision pipeline that classifies waste images into six categories (cardboard, glass, metal, paper, plastic, and trash). It uses a fine-tuned MobileNetV2 with a custom classification head, class weighting, and data augmentation. A confidence threshold of 0.80, chosen on the validation set, accepts a prediction only when the model is confident enough. Lower-confidence items are flagged as "uncertain" so they could be checked manually.
 
 [![Live Demo](https://img.shields.io/badge/HuggingFace-Spaces%20Demo-yellow)](DEMO_LINK_HERE)
 [![GitHub Repository](https://img.shields.io/badge/GitHub-Repository-blue)](REPO_LINK_HERE)
@@ -9,12 +9,12 @@ EcoVision is an end-to-end computer vision and selective classification system d
 
 ## Benchmark Results
 
-All figures below are extracted directly from saved evaluation reports (`reports/baseline_vs_transfer_val.csv`, `reports/augmentation_runs.csv`, `reports/test_comparison.csv`, and `reports/test_bootstrap_ci.json`). The holdout test set remained strictly sealed until final Phase 6 benchmarking.
+All figures below come from saved evaluation reports (`reports/baseline_vs_transfer_val.csv`, `reports/augmentation_runs.csv`, `reports/test_comparison.csv`, and `reports/test_bootstrap_ci.json`). The test set was not used until the final evaluation (Phase 6) and was evaluated once.
 
 | Model Pipeline | Val Accuracy | Val Macro-F1 | Test Accuracy (95% Bootstrap CI) | Test Macro-F1 (95% Bootstrap CI) |
 | :--- | :---: | :---: | :---: | :---: |
 | **Baseline CNN (Scratch)** | 69.13% | 0.6658 | 67.81% [63.05%, 72.30%] | 0.6477 [0.5953, 0.6959] |
-| **MobileNetV2 Transfer (Phase 4)** | 90.50% | 0.8988 | *Holdout Sealed* | *Holdout Sealed* |
+| **MobileNetV2 Transfer (Phase 4)** | 90.50% | 0.8988 | *Not evaluated on test* | *Not evaluated on test* |
 | **MobileNetV2 Final (Seed 44)** | **91.82%** | **0.9221** | **89.71% [86.54%, 92.61%]** | **0.8647 [0.8195, 0.9036]** |
 
 ---
@@ -22,17 +22,17 @@ All figures below are extracted directly from saved evaluation reports (`reports
 ## Dataset & Provenance
 
 - **Primary Source:** Gary Thung and Mindy Yang, *TrashNet* ([github.com/garythung/trashnet](https://github.com/garythung/trashnet), commit `6fa2b87`).
-- **Hugging Face Mirror Discrepancy:** The Hugging Face mirror (`garythung/trashnet`) contains 5,054 rows because its automated dataset loader ingested both `dataset-original.zip` (2,527 high-resolution captures) and `dataset-resized.zip` (2,527 downscaled 512×384 captures) into the same default `train` split, duplicating every sample at two resolutions (2,527 × 2 = 5,054).
-- **Label Conflict Removal:** An MD5 and perceptual hash audit identified 3 duplicate image pairs with contradictory class labels (e.g. `glass115.jpg` vs `metal91.jpg`, `glass176.jpg` vs `plastic152.jpg`, and `glass389.jpg` vs `plastic332.jpg`). All 6 ambiguous images were permanently removed to eliminate label noise, leaving 2,521 clean, unique photos.
-- **Class Distribution & Imbalance:** The dataset displays a **4.34:1** class imbalance ratio between paper (594 images, 23.51%) and trash (137 images, 5.42%):
+- **Hugging Face Mirror:** The mirror (`garythung/trashnet`) contains 5,054 rows. These are the original archive (2,527 photos) plus the resized archive (512×384) of the same 2,527 photos, so every photo appears twice (2,527 × 2 = 5,054). Only one copy of each photo was used.
+- **Label Conflict Removal:** An MD5 and perceptual-hash audit found 3 duplicate image pairs with contradictory class labels (`glass115.jpg` vs `metal91.jpg`, `glass176.jpg` vs `plastic152.jpg`, and `glass389.jpg` vs `plastic332.jpg`). All 6 ambiguous images were removed, leaving 2,521 clean images.
+- **Class Distribution & Imbalance:** The imbalance ratio is **4.34:1**, between paper (594 images, 23.51%) and trash (137 images, 5.42%):
   - `paper`: 594 images (train: 416, val: 89, test: 89)
   - `glass`: 498 images (train: 348, val: 75, test: 75)
   - `plastic`: 480 images (train: 336, val: 72, test: 72)
   - `metal`: 409 images (train: 285, val: 62, test: 62)
   - `cardboard`: 403 images (train: 283, val: 60, test: 60)
   - `trash`: 137 images (train: 95, val: 21, test: 21)
-  - **Total:** 2,521 images across 70% Train (1,763), 15% Validation (379), and 15% Test (379).
-- **Near-Duplicate Grouping:** Perceptual hashing (`pHash`) with connected components at Hamming distance $\le 4$ grouped near-identical photo shots into shared group IDs, ensuring zero leakage of identical objects across train, validation, and test splits.
+  - **Total:** 2,521 images, split 70% train (1,763), 15% validation (379), 15% test (379), with a fixed seed (42).
+- **Near-Duplicate Grouping:** Perceptual hashing (pHash) with connected components at Hamming distance <= 4 grouped near-identical photos into shared groups, and each group was kept inside a single split. This reduces leakage between train, validation and test, but cannot guarantee that no near-duplicates remain (see limitations).
 
 ---
 
@@ -40,32 +40,32 @@ All figures below are extracted directly from saved evaluation reports (`reports
 
 ![EcoVision Architecture Pipeline](docs/architecture.png)
 
-*The complete pipeline flow from dual-archive audit and stratified group partitioning to two-stage transfer learning, selective confidence rejection, and edge deployment.*
+*Pipeline: dataset audit and de-duplication, stratified group split, 224x224 cache, baseline CNN and two-stage MobileNetV2, validation-based selection and threshold, final test evaluation, and inference/demo.*
 
 ---
 
 ## Methodology
 
-1. **Baseline CNN:** Built from scratch with 4 convolutional blocks (Conv2d -> BatchNorm2d -> ReLU -> MaxPool2d), Global Average Pooling, Dropout (0.3), and a linear classification head (390,438 total parameters). Trained with Adam (`lr=1e-3`), inverse frequency class weights derived strictly from the training split, and early stopping on validation macro-F1 (patience 7).
+1. **Baseline CNN:** Built from scratch with 4 convolutional blocks (Conv2d -> BatchNorm2d -> ReLU -> MaxPool2d), Global Average Pooling, Dropout (0.3), and a linear head (390,438 parameters). Trained with Adam (`lr=1e-3`), inverse-frequency class weights computed from the training split only, and early stopping on validation macro-F1 (patience 7).
 2. **Two-Stage MobileNetV2 Fine-Tuning:**
-   - *Stage 1 (Feature Extraction):* ImageNet-pretrained backbone frozen (`requires_grad=False`), training only the custom classifier head (`Dropout(0.3) -> Linear(1280, 6)`) with Adam (`lr=1e-3`, max 10 epochs, patience 3).
-   - *Stage 2 (Discriminative Fine-Tuning):* Unfreezing the last 3 inverted residual blocks (`features[-3:]`), keeping all frozen BatchNorm layers in `eval()` mode, and fine-tuning with differential learning rates (`1e-4` for backbone, `1e-3` for classifier head, max 20 epochs, patience 5).
-3. **Data Augmentation Experiment (3 Random Seeds):** Evaluated across seeds 42, 43, and 44 comparing un-augmented training against real-time training augmentations (RandomHorizontalFlip, RandomRotation $\pm 15^\circ$, ColorJitter, and RandomResizedCrop 0.7–1.0). Augmentation delivered a statistically robust **+0.0179 macro-F1** improvement (0.9179 ± 0.0037 vs 0.9001 ± 0.0064) and compressed the train/val loss gap from 0.2769 to 0.1918. Model checkpoint **Seed 44** achieved the highest validation macro-F1 (0.9221) and was selected as `models/mobilenetv2_final.pt`.
+   - *Stage 1 (feature extraction):* ImageNet-pretrained backbone frozen, training only the head (`Dropout(0.3) -> Linear(1280, 6)`) with Adam (`lr=1e-3`, max 10 epochs, patience 3).
+   - *Stage 2 (fine-tuning):* The last 3 inverted residual blocks (`features[-3:]`) were unfrozen, with BatchNorm layers kept in `eval()` mode and different learning rates (`1e-4` backbone, `1e-3` head, max 20 epochs, patience 5).
+3. **Data Augmentation Experiment (3 seeds):** Seeds 42, 43 and 44 compared training without augmentation against RandomHorizontalFlip, RandomRotation (±15°), ColorJitter and RandomResizedCrop (0.7–1.0). Augmentation gave a consistent **+0.0179 macro-F1** improvement on validation across the 3 seeds (0.9179 ± 0.0037 vs 0.9001 ± 0.0064) and reduced the train/val loss gap from 0.2769 to 0.1918. Three seeds is a small sample, so this is evidence, not proof. The seed 44 checkpoint had the highest validation macro-F1 (0.9221) and was saved as `models/mobilenetv2_final.pt`.
 
 ---
 
-## Selective Classification & Confidence Thresholding
+## Confidence Threshold (Selective Classification)
 
-In recycling automation, false positive errors can contaminate material bales. Selective classification introduces a reject option based on model prediction confidence.
+A prediction is accepted only if its confidence is at least the threshold; otherwise it is marked "uncertain".
 
-The threshold was optimized strictly on validation predictions (`reports/threshold_sweep.csv`) using the pre-committed rule: *Highest coverage with validation accuracy $\ge$ 95%*. The cutoff was selected at **0.80**.
+The threshold was chosen **using validation predictions only** (`reports/threshold_sweep.csv`) with a rule fixed in advance: *highest coverage such that validation accuracy on answered images is >= 95%*. This selected **0.80**.
 
-| Evaluation Split | Threshold | Coverage (%) | Num Answered | Num Rejected | Accuracy on Answered | Macro-F1 on Answered |
+| Evaluation Split | Threshold | Coverage | Answered | Rejected | Accuracy on Answered | Macro-F1 on Answered |
 | :--- | :---: | :---: | :---: | :---: | :---: | :---: |
-| **Validation Split** | 0.80 | 92.88% | 352 / 379 | 27 (7.12%) | 95.17% | 0.9531 |
-| **Holdout Test Split** | 0.80 | 86.81% | 329 / 379 | 50 (13.19%) | 95.14% | 0.9231 |
+| **Validation** | 0.80 | 92.88% | 352 / 379 | 27 (7.12%) | 95.17% | 0.9531 |
+| **Test** | 0.80 | 86.81% | 329 / 379 | 50 (13.19%) | 95.14% | 0.9231 |
 
-**Key Finding:** The test set rejected more images than validation (50 rejected / 13.19% on test vs 27 rejected / 7.12% on validation). This occurs because holdout test samples exhibit higher natural variance and edge-case ambiguity, causing more predictions to fall below the 0.80 cutoff. However, on answered items, test accuracy reached **95.14%**, eliminating 25 out of 39 test errors.
+**Key finding:** The test set rejected more images than validation (50 / 13.19% vs 27 / 7.12%). A likely reason is that the checkpoint and the threshold were both chosen on validation, so validation is slightly optimistic (a hypothesis, not tested). On the answered test images, accuracy was 95.14%. The threshold removed 23 of the 39 test errors, but it also rejected 27 images that were classified correctly. This is the trade-off between coverage and accuracy. The threshold was not re-tuned on the test set.
 
 ---
 
@@ -73,26 +73,26 @@ The threshold was optimized strictly on validation predictions (`reports/thresho
 
 ![Test Set Failure Cases](reports/failure_cases.png)
 
-Out of 379 holdout test samples, 39 errors occurred (89.71% raw accuracy). The primary failure modes include:
-1. **Glass vs. Plastic Confusion:** Cylindrical transparent plastic bottles and glass jars share near-identical specular reflections and edge contours against white backgrounds.
-2. **Minority Trash Volatility:** The `trash` class has only 21 holdout test examples, resulting in 9 false negatives and an unweighted class F1 of 0.6316.
-3. **Cardboard vs. Crumpled Material:** Flattened brown cardboard vs. soiled brown paper bags or metallic wrappers under diffuse lighting.
+Out of 379 test images, 39 were misclassified (89.71% accuracy); all errors are listed in `reports/test_errors.csv`. The main failure patterns are below. The reasons given are **hypotheses and were not tested**:
+1. **Glass vs. plastic:** Transparent plastic bottles and glass jars can look similar (reflections, shape) against a white background.
+2. **Trash class:** Trash has the lowest F1 of all classes (0.6316). It has only 137 images (21 in the test set), so its metrics are uncertain, and the class contains very varied items.
+3. **Cardboard vs. paper:** Brown paper and flattened cardboard can look alike under soft lighting.
 
 ---
 
-## Hardware Latency Benchmarks
+## Latency Benchmarks
 
-Measured using `src/measure_latency.py` with 10 warmup iterations and 100 timed runs (`torch.cuda.synchronize()` on GPU).
+Measured with `src/measure_latency.py` (10 warm-up runs, 100 timed runs, `torch.cuda.synchronize()` on GPU).
 
-- **Model Parameters:** 2,231,558 trainable parameters
-- **Checkpoint File Size:** 8.75 MB (`models/mobilenetv2_final.pt`)
+- **Model parameters:** 2,231,558
+- **Checkpoint size:** 8.75 MB (`models/mobilenetv2_final.pt`)
 
-| Execution Hardware | Device Specification | Forward Pass (Median / p95) | End-to-End (Median / p95) |
+| Hardware | Device | Model only (Median / p95) | End-to-end (Median / p95) |
 | :--- | :--- | :---: | :---: |
-| **GPU** | NVIDIA GeForce RTX 3050 6GB Laptop GPU | **9.22 ms / 12.38 ms** | **11.94 ms / 13.88 ms** |
-| **CPU** | AMD64 Family 25 Model 68 Stepping 1 | **22.95 ms / 31.95 ms** | **24.38 ms / 29.38 ms** |
+| **GPU** | NVIDIA GeForce RTX 3050 6GB Laptop GPU | 9.22 ms / 12.38 ms | 11.94 ms / 13.88 ms |
+| **CPU** | AMD64 Family 25 Model 68 Stepping 1 | 22.95 ms / 31.95 ms | 24.38 ms / 29.38 ms |
 
-Both GPU (~12 ms) and CPU (~24 ms) end-to-end execution times satisfy industrial real-time sorting constraints (<50 ms per item).
+End-to-end means image loading, preprocessing and the model. Both are fast enough for interactive use on a laptop.
 
 ---
 
@@ -113,8 +113,6 @@ pip check
 ```
 
 ### 2. Pipeline Execution Order
-Each script exists in `src/` and provides a runnable `main()` entry point:
-
 ```bash
 # 1. Hardware verification
 python src/check_gpu.py
@@ -124,20 +122,20 @@ python src/test_env.py
 python src/download_dataset.py
 python src/data_audit.py
 
-# 3. Deduplication & Stratified Group Splitting (caches 224x224 images to data/processed/)
+# 3. Deduplication & stratified group split (caches 224x224 images to data/processed/)
 python src/dedupe_split.py
 python src/inspect_pairs.py
 
-# 4. Modeling pipelines
+# 4. Models
 python src/train_baseline.py
 python src/train_transfer.py
 python src/train_augmentation.py
 
-# 5. Final Holdout Evaluation & Threshold Tuning
+# 5. Final test evaluation & threshold tuning
 python src/evaluate_test.py
 python src/tune_threshold.py
 
-# 6. Latency Benchmarking
+# 6. Latency benchmark
 python src/measure_latency.py
 ```
 
@@ -145,28 +143,20 @@ python src/measure_latency.py
 
 ## Inference Usage
 
-### Command Line Interface (CLI)
+### Command Line
 ```bash
 python src/predict.py demo_examples/cardboard101.jpg
 ```
-Output:
+Example output (shortened):
 ```text
-==================================================
-EcoVision Classification Result
-==================================================
 Image     : cardboard101.jpg
 Predicted : cardboard
 Confidence: 100.00%
 Status    : ACCEPTED (confidence >= 80.0%)
-
-Top-3 Predictions:
-  1. cardboard : 100.00%
-  2. paper     : 0.00%
-  3. trash     : 0.00%
-==================================================
 ```
+The script also prints the top-3 classes. Images below the threshold are reported as UNCERTAIN.
 
-### Programmatic Python API
+### Python
 ```python
 from PIL import Image
 from src.predict import predict_image
@@ -180,28 +170,31 @@ print("Uncertain Flag  :", result["uncertain"])
 print("Probabilities   :", result["probabilities"])
 ```
 
-### Interactive Web Application
+### Web App
 ```bash
-# Run local Gradio interface (opens at http://127.0.0.1:7860)
+# Local Gradio interface (http://127.0.0.1:7860)
 python app.py
 ```
+Web demo (Streamlit): `streamlit run space/streamlit_app.py`
+
 
 ---
 
-## Important Technical Caveats & Preprocessing Note
+## Technical Notes & Limitations
 
-- **Raw Image vs. Pre-cached 224 JPEG Inference Difference:** Predictions run directly on original uncompressed `512×384` images can differ slightly in probability compared to the pre-cached 224×224 JPEG files (largest observed difference was 0.065 on one `trash` image, with predicted class remaining unchanged). The reason is an **UNTESTED hypothesis**: the 224×224 cache was saved with lossy JPEG compression (`quality=95`), which introduces minor high-frequency DCT quantization artifacts that are absent when resizing directly in memory from raw pixels.
-- **Limitations for Real Campus Waste:**
-  1. *Clean Background Bias:* TrashNet was collected under controlled laboratory conditions on plain white posterboard. Real-world municipal or campus waste is severely deformed, dirty, stained, overlapping, and photographed under harsh outdoor lighting.
-  2. *Small Dataset Size:* Only ~2.5k unique images across 6 classes.
-  3. *Minority Trash Support:* Only 137 total trash images (~21 test images), leading to higher performance volatility.
-  4. *Absence of Complex Categories:* Does not contain multi-material items (e.g. coffee cups with plastic linings), food waste, or e-waste.
-  5. *Softmax Overconfidence:* Standard softmax can produce high confidence on novel out-of-distribution items.
-  6. *Validation Selection Effect:* Test macro-F1 (0.8647) is lower than validation macro-F1 (0.9221) because the checkpoint and hyperparameters were optimized on the validation set.
+- **Original image vs. cached 224 JPEG:** Predictions on the original 512×384 image can differ slightly from predictions on the cached 224×224 JPEG. The largest difference observed was 0.065 in confidence on one `trash` image, and the predicted class never changed. The reason is an **untested hypothesis**: the cache was saved as JPEG (`quality=95`), and that lossy re-encoding may change pixel values slightly.
+- **Limitations for real campus waste:**
+  1. *Clean backgrounds:* TrashNet photos are single items on a plain white background. Real campus waste is dirty, crushed, overlapping, and photographed under varied lighting and phone cameras.
+  2. *Small dataset:* About 2.5k images across 6 classes.
+  3. *Small trash class:* Only 137 trash images (about 21 in the test set), so trash metrics are unstable.
+  4. *Missing categories:* No food-soiled items, multi-material items (e.g. coffee cups), food waste or e-waste, and only 6 classes in total.
+  5. *Over-confident softmax:* Softmax confidence can be high even on unfamiliar items, so the threshold is not a guarantee.
+  6. *Near-duplicate leakage:* Grouping by perceptual hash reduces but does not fully exclude near-duplicates across splits.
+  7. *Validation selection effect:* Test macro-F1 (0.8647) is lower than validation macro-F1 (0.9221) because the checkpoint was selected on validation. The test numbers are the honest estimate.
 
 ---
 
 ## Credits & License
 
-- **Dataset:** Gary Thung and Mindy Yang, *TrashNet* ([github.com/garythung/trashnet](https://github.com/garythung/trashnet)), distributed under the MIT License.
-- **How This Was Built:** AI coding assistants were utilized as pair programming tools to implement, document, and test the codebase. Every numerical metric, table, and confidence interval reported in this repository was empirically generated and logged by automated scripts directly into `reports/` and `models/`.
+- **Dataset:** Gary Thung and Mindy Yang, *TrashNet* ([github.com/garythung/trashnet](https://github.com/garythung/trashnet)), MIT License.
+- **How this was built:** AI coding assistants were used to write, document and test the code. Every reported number was generated by the scripts in this repository into `reports/` and `models/`.
