@@ -120,18 +120,53 @@ def predict_image(
 
 
 def main():
-    st.set_page_config(page_title="EcoVision", page_icon="♻️", layout="centered")
+    st.set_page_config(page_title="EcoVision", page_icon="♻️", layout="wide")
 
+    # Light custom CSS for modern aesthetics, rounded corners, card hover effects, and theme compatibility
+    custom_css = """
+    <style>
+    .main .block-container {
+        max-width: 1050px;
+        padding-top: 2rem;
+        padding-bottom: 3rem;
+    }
+    img {
+        border-radius: 8px;
+    }
+    div[data-testid="stMetric"] {
+        background: rgba(128, 128, 128, 0.08);
+        border: 1px solid rgba(128, 128, 128, 0.2);
+        border-radius: 8px;
+        padding: 0.75rem 1rem;
+    }
+    div[data-testid="column"] img {
+        transition: transform 0.2s ease, box-shadow 0.2s ease;
+    }
+    div[data-testid="column"]:hover img {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
+    }
+    </style>
+    """
+    st.markdown(custom_css, unsafe_allow_html=True)
+
+    # Header Section
     st.title("EcoVision")
+    st.markdown("#### Waste image classification with a confidence threshold")
     st.caption(
         "MobileNetV2, confidence threshold 0.80 (chosen on validation) • "
         "[GitHub Repository](https://github.com/kashifabrar24/EcoVision)"
     )
-    st.write(
-        "Automated recyclable waste classification into 6 categories: "
-        "**cardboard, glass, metal, paper, plastic, and trash**."
-    )
 
+    # Metric Cards
+    col_m1, col_m2, col_m3 = st.columns(3)
+    col_m1.metric(label="Test Accuracy", value="89.71%")
+    col_m2.metric(label="Test Macro-F1", value="0.8647")
+    col_m3.metric(label="Confidence Threshold", value="0.80")
+
+    st.write("")
+
+    # Honest limitations note
     st.info(
         "**Note:** The model is trained on clean single-item photos on a plain background, "
         "so real campus waste may be harder."
@@ -150,7 +185,7 @@ def main():
         st.error(f"Error loading model: {e}")
         return
 
-    # Section 1: Example Images
+    # Section 1: Example Image Cards
     st.write("### Try an Example Image")
     example_items = [
         ("Cardboard", "cardboard101.jpg"),
@@ -163,11 +198,13 @@ def main():
 
     cols = st.columns(6)
     for col, (label, filename) in zip(cols, example_items):
-        if col.button(label, use_container_width=True):
+        with col:
             ex_path = DEMO_DIR / filename
             if ex_path.exists():
-                st.session_state.selected_image = Image.open(ex_path)
-                st.session_state.source_name = f"Example: {filename}"
+                st.image(str(ex_path), use_container_width=True)
+                if st.button(label, key=f"btn_{filename}", use_container_width=True):
+                    st.session_state.selected_image = Image.open(ex_path)
+                    st.session_state.source_name = f"Example: {filename}"
 
     # Section 2: Upload Option
     st.write("### Or Upload an Image")
@@ -220,6 +257,10 @@ def main():
         ).set_index("Class")
 
         st.bar_chart(chart_data)
+
+    # Footer
+    st.markdown("---")
+    st.caption("Dataset: TrashNet (Gary Thung and Mindy Yang, MIT license)")
 
 
 if __name__ == "__main__":
