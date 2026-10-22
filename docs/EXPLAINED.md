@@ -511,6 +511,25 @@ Serves as an exhaustive technical preparation guide for code reviews and recruit
 3. **Q: How does the document address the question of real-world deployment limitations?**
    - **A:** It honestly acknowledges domain shift: TrashNet consists of clean, single items on white posterboard, whereas real campus waste is crushed, food-soiled, multi-object, and viewed under variable lighting. Deploying to real bins requires in-situ collection and multi-label object detection.
 
+---
+
+## 29. `docs/REQUIREMENTS_CHECKLIST.md`
+
+### What it does
+Provides a comprehensive traceability matrix mapping every foundational engineering requirement, modeling objective, brownie point specification, and deliverable across all 11 project phases directly to the files, code modules, and test reports that prove their completion. Each item is audited with a status badge (`Done` / `Partial` / `Not done`) alongside rigorous technical verification notes.
+
+### Why it exists
+Fulfills Phase 11 audit requirements by establishing an unambiguous, transparent verification contract. It allows evaluators, hiring managers, and code auditors to cross-examine every claimed feature against concrete repository artifacts without guessing or manual searching.
+
+### Interview Questions & Answers
+1. **Q: Why is a requirements traceability matrix valuable in commercial machine learning projects?**
+   - **A:** ML projects often suffer from scope creep or incomplete validation where models are trained but critical operational safeguards (such as leak-proof splitting, confidence rejection, or edge latency profiling) are skipped. A traceability matrix guarantees that every business and technical constraint has been implemented and empirically proven.
+2. **Q: How does the checklist prove that data leakage was prevented?**
+   - **A:** It references `src/dedupe_split.py` and `reports/near_duplicates_metrics.json`, explaining how connected components on perceptual hash Hamming distances $\le 4$ ensured that identical object poses were grouped atomically into the same split rather than leaking between train and test.
+3. **Q: What role do the "technical verification notes" play in recruitment reviews?**
+   - **A:** Rather than just checking off a box, the verification notes explain the exact algorithmic mechanism (e.g. inverse-frequency class weights, two-stage fine-tuning with frozen BatchNorm, 1,000-resample bootstrap CIs), demonstrating that the developer understands the underlying engineering rationale.
+
+
 
 
 

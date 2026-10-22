@@ -147,7 +147,7 @@ python src/measure_latency.py
 
 ### Command Line Interface (CLI)
 ```bash
-python src/predict.py data/processed/test/cardboard/cardboard101.jpg
+python src/predict.py demo_examples/cardboard101.jpg
 ```
 Output:
 ```text
