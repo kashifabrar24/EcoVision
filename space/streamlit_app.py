@@ -4,7 +4,6 @@ Self-contained Streamlit web demo for automated recyclable waste classification.
 Runs entirely on CPU with zero external project dependencies outside standard libraries.
 """
 
-import base64
 import json
 from pathlib import Path
 from typing import Dict, Union
@@ -120,69 +119,29 @@ def predict_image(
     }
 
 
-def get_image_base64(path: Path) -> str:
-    """Return base64 string for embedding local thumbnail images."""
-    with open(path, "rb") as f:
-        return base64.b64encode(f.read()).decode("utf-8")
-
-
 def main():
-    st.set_page_config(layout="wide", page_title="EcoVision", page_icon="♻️")
+    st.set_page_config(page_title="EcoVision", page_icon="♻️", layout="centered")
 
-    # Light CSS for clean tool aesthetics, consistent spacing, and subtle borders
-    custom_css = """
-    <style>
-    .main .block-container {
-        max-width: 1080px;
-        padding-top: 1.8rem;
-        padding-bottom: 2.5rem;
-    }
-    img {
-        border-radius: 6px;
-    }
-    div[data-testid="stButton"] button {
-        border-radius: 6px;
-        padding: 0.25rem 0.5rem;
-        font-size: 0.85rem;
-    }
-    .thumb-card {
-        border-radius: 6px;
-        overflow: hidden;
-        margin-bottom: 6px;
-        transition: border-color 0.15s ease;
-    }
-    </style>
-    """
-    st.markdown(custom_css, unsafe_allow_html=True)
-
-    # Header
     st.title("EcoVision")
+    st.caption(
+        "MobileNetV2, confidence threshold 0.80 (chosen on validation) • "
+        "[GitHub Repository](https://github.com/kashifabrar24/EcoVision)"
+    )
     st.write(
-        "Pick a sample or upload a photo of a single item. If the model is less than 80% sure, "
-        "it says so instead of guessing."
+        "Automated recyclable waste classification into 6 categories: "
+        "**cardboard, glass, metal, paper, plastic, and trash**."
     )
 
-    with st.expander("About this model"):
-        st.markdown(
-            "- **Architecture:** MobileNetV2 with transfer learning\n"
-            "- **Dataset:** TrashNet (2,521 images after cleaning, 6 classes, 379 test images)\n"
-            "- **Test accuracy:** 89.71%\n"
-            "- **Test macro-F1:** 0.8647\n"
-            "- **Confidence threshold:** 0.80 (chosen on validation)\n"
-            "- **Repository:** [https://github.com/kashifabrar24/EcoVision](https://github.com/kashifabrar24/EcoVision)\n\n"
-            "**Note on campus waste:** The model is trained on clean single-item photos on a plain background, "
-            "so real campus waste may be harder."
-        )
+    st.info(
+        "**Note:** The model is trained on clean single-item photos on a plain background, "
+        "so real campus waste may be harder."
+    )
 
-    st.write("")
-
-    # Session state initialization
+    # Initialize session state for selected image and source name
     if "selected_image" not in st.session_state:
         st.session_state.selected_image = None
     if "source_name" not in st.session_state:
         st.session_state.source_name = None
-    if "selected_sample" not in st.session_state:
-        st.session_state.selected_sample = None
 
     # Load model
     try:
@@ -191,128 +150,76 @@ def main():
         st.error(f"Error loading model: {e}")
         return
 
-    # Two panels: Left (Choose an image) & Right (Result)
-    left_col, right_col = st.columns([1, 1], gap="large")
+    # Section 1: Example Images
+    st.write("### Try an Example Image")
+    example_items = [
+        ("Cardboard", "cardboard101.jpg"),
+        ("Glass", "glass113.jpg"),
+        ("Metal", "metal100.jpg"),
+        ("Paper", "paper10.jpg"),
+        ("Plastic", "plastic114.jpg"),
+        ("Trash", "trash1.jpg"),
+    ]
 
-    with left_col:
-        st.subheader("1. Choose an image")
+    cols = st.columns(6)
+    for col, (label, filename) in zip(cols, example_items):
+        if col.button(label, use_container_width=True):
+            ex_path = DEMO_DIR / filename
+            if ex_path.exists():
+                st.session_state.selected_image = Image.open(ex_path)
+                st.session_state.source_name = f"Example: {filename}"
 
-        # 3x2 Grid for sample images
-        example_items = [
-            ("Cardboard", "cardboard101.jpg"),
-            ("Glass", "glass113.jpg"),
-            ("Metal", "metal100.jpg"),
-            ("Paper", "paper10.jpg"),
-            ("Plastic", "plastic114.jpg"),
-            ("Trash", "trash1.jpg"),
-        ]
+    # Section 2: Upload Option
+    st.write("### Or Upload an Image")
+    uploaded_file = st.file_uploader(
+        "Choose an image file",
+        type=["jpg", "jpeg", "png", "webp"],
+        label_visibility="collapsed",
+    )
+    if uploaded_file is not None:
+        st.session_state.selected_image = Image.open(uploaded_file)
+        st.session_state.source_name = f"Uploaded: {uploaded_file.name}"
 
-        # Row 1 (first 3)
-        row1_cols = st.columns(3)
-        for col, (label, filename) in zip(row1_cols, example_items[:3]):
-            with col:
-                ex_path = DEMO_DIR / filename
-                if ex_path.exists():
-                    is_selected = (st.session_state.selected_sample == filename)
-                    border = "2px solid #2F7D4F" if is_selected else "1px solid rgba(128, 128, 128, 0.25)"
-                    b64_img = get_image_base64(ex_path)
-                    st.markdown(
-                        f'<div class="thumb-card" style="border: {border};">'
-                        f'<img src="data:image/jpeg;base64,{b64_img}" style="width: 100%; aspect-ratio: 1; object-fit: cover; display: block;" />'
-                        f'</div>',
-                        unsafe_allow_html=True,
-                    )
-                    if st.button(label, key=f"btn_{filename}", use_container_width=True):
-                        st.session_state.selected_image = Image.open(ex_path)
-                        st.session_state.source_name = f"Example: {filename}"
-                        st.session_state.selected_sample = filename
-                        st.rerun()
+    # Section 3: Prediction and Visualizations
+    if st.session_state.selected_image is not None:
+        st.write("---")
+        img = st.session_state.selected_image
+        res = predict_image(img, model)
+        pred_class = res["predicted_class"]
+        conf = res["confidence"]
+        is_uncertain = res["uncertain"]
 
-        st.write("")
+        col_img, col_pred = st.columns([1, 1])
 
-        # Row 2 (next 3)
-        row2_cols = st.columns(3)
-        for col, (label, filename) in zip(row2_cols, example_items[3:]):
-            with col:
-                ex_path = DEMO_DIR / filename
-                if ex_path.exists():
-                    is_selected = (st.session_state.selected_sample == filename)
-                    border = "2px solid #2F7D4F" if is_selected else "1px solid rgba(128, 128, 128, 0.25)"
-                    b64_img = get_image_base64(ex_path)
-                    st.markdown(
-                        f'<div class="thumb-card" style="border: {border};">'
-                        f'<img src="data:image/jpeg;base64,{b64_img}" style="width: 100%; aspect-ratio: 1; object-fit: cover; display: block;" />'
-                        f'</div>',
-                        unsafe_allow_html=True,
-                    )
-                    if st.button(label, key=f"btn_{filename}", use_container_width=True):
-                        st.session_state.selected_image = Image.open(ex_path)
-                        st.session_state.source_name = f"Example: {filename}"
-                        st.session_state.selected_sample = filename
-                        st.rerun()
-
-        st.write("")
-        st.write("**Or upload your own image:**")
-        uploaded_file = st.file_uploader(
-            "Upload an image",
-            type=["jpg", "jpeg", "png", "webp"],
-            label_visibility="collapsed",
-        )
-        if uploaded_file is not None:
-            st.session_state.selected_image = Image.open(uploaded_file)
-            st.session_state.source_name = f"Uploaded: {uploaded_file.name}"
-            st.session_state.selected_sample = None
-
-    with right_col:
-        st.subheader("2. Result")
-
-        if st.session_state.selected_image is None:
-            st.info("Pick a sample from the left or upload an image to classify.")
-        else:
-            img = st.session_state.selected_image
+        with col_img:
             st.image(img, caption=st.session_state.source_name, use_container_width=True)
 
-            res = predict_image(img, model)
-            pred_class = res["predicted_class"]
-            conf = res["confidence"]
-            is_uncertain = res["uncertain"]
-
+        with col_pred:
             if is_uncertain:
                 st.warning(
-                    f"Uncertain: confidence below the 80% threshold, closest class: {pred_class}"
+                    f"Uncertain: confidence below threshold, closest class: {pred_class}"
                 )
             else:
                 st.success(
                     f"Predicted: {pred_class} (confidence {conf * 100:.1f}%)"
                 )
 
-            # Top-3 classes as compact rows with progress bars
+            # Top-3 classes with percentages
             sorted_probs = sorted(res["probabilities"].items(), key=lambda x: x[1], reverse=True)
-            st.write("**Top-3 classes**")
-            for cls_name, prob_val in sorted_probs[:3]:
-                st.write(f"{cls_name} — {prob_val * 100:.1f}%")
-                st.progress(min(max(float(prob_val), 0.0), 1.0))
+            st.write("**Top-3 Classes:**")
+            for rank, (cls_name, prob_val) in enumerate(sorted_probs[:3], 1):
+                st.write(f"{rank}. **{cls_name}**: {prob_val * 100:.1f}%")
 
-            st.write("")
-            # Small bar chart of all 6 probabilities
-            st.write("**All class probabilities**")
-            chart_data = pd.DataFrame(
-                {
-                    "Class": list(res["probabilities"].keys()),
-                    "Probability": list(res["probabilities"].values()),
-                }
-            ).set_index("Class")
-            st.bar_chart(chart_data, height=180)
+        # Bar chart of all 6 class probabilities
+        st.write("### Class Probabilities")
+        chart_data = pd.DataFrame(
+            {
+                "Class": list(res["probabilities"].keys()),
+                "Probability": list(res["probabilities"].values()),
+            }
+        ).set_index("Class")
 
-            # Short caption under the result
-            st.caption(
-                "Note: The model is trained on clean single-item photos on a plain background, "
-                "so real campus waste may be harder."
-            )
-
-    # Footer
-    st.markdown("---")
-    st.caption("Dataset: TrashNet (Gary Thung and Mindy Yang, MIT license)")
+        st.bar_chart(chart_data)
 
 
 if __name__ == "__main__":
